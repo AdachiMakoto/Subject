@@ -1,0 +1,15 @@
+# Add any directories, files, or patterns you don't want to be tracked by version control
+.vscode/
+.vs/
+*.sln
+*_BuiltData.uasset
+
+### Unreal Engine 5 ###
+Saved/ 
+DerivedDataCache/
+Intermediate/
+# Model/
+
+# System File
+.DS_Store
+Thumbs.db
