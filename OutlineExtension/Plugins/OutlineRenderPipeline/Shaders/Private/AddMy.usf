@@ -1,58 +1,39 @@
-// Copyright 2024 kafues511. All Rights Reserved.
+// Copyright 2025 akoto. All Rights Reserved.
 
 /*=============================================================================
-	Outline.usf: 輪郭線描画
+	AddMy.usf: テスト用の追加描画
 =============================================================================*/
 
 #include "/Engine/Private/Common.ush"
 #include "/Engine/Private/SceneTexturesCommon.ush"
 #include "/Engine/Private/DeferredShadingCommon.ush"
-// #include "/Engine/Private/ScreenPass.ush"
+#include "/Engine/Private/ScreenPass.ush"
+// #include "/Engine/Private/PostProcessCommon.ush"
 
-static const uint   kSampleCount = 4;
-static const float2 kSampleOffsetArray[kSampleCount] = {
-	float2( 0.0, -1.0),
-	float2( 1.0,  0.0),
-	float2( 0.0,  1.0),
-	float2(-1.0,  0.0),
-};
+SCREEN_PASS_TEXTURE_VIEWPORT(Input)
 
-float Radius;
-float Bias;
-float Intensity;
-float3 Color;
-// Test
-float4 TestColor;
+Texture2D<uint> LineTexture;
+float4 LineColor;
+float MaterialThreshold;
+float DepthThreshold;
+float NormalThreshold;
+float PlanarThreshold;
+float NonLineSpecular;
+int LineWidth;
+int SearchRangeMin;
+int SearchRangeMax;
 
-
-void AddMyPS(
-	FScreenVertexOutput Input,
-	out float4 OutColor : SV_Target0)
+void AddMyPS(float4 SvPosition : SV_POSITION, out float4 OutColor : SV_Target0, out float OutDepth : SV_Depth)
 {
-	float2 BufferUV   = Input.UV;
-	float2 ClampedUV  = clamp(BufferUV, View.BufferBilinearUVMinMax.xy, View.BufferBilinearUVMinMax.zw);
+    // int2 PixelPos = int2(SvPosition.xy);
+    float Depth = 0.f;
+    // if (!FindLine(PixelPos, Depth))
+    // {
+    //     discard;
+    //     return;
+    // }
 
-	float Weight         = 0.0;
-	float SceneDepth     = CalcSceneDepth(ClampedUV);
-	float NearSceneDepth = SceneDepth;
-
-	UNROLL
-	for (uint i = 0; i < kSampleCount; ++i)
-	{
-		float2 NewBufferUV   = BufferUV + ViewportUVToBufferUV(Radius * kSampleOffsetArray[i] * View.ViewSizeAndInvSize.zw);
-		float2 NewClampedUV  = clamp(NewBufferUV, View.BufferBilinearUVMinMax.xy, View.BufferBilinearUVMinMax.zw);
-		float  NewSceneDepth = CalcSceneDepth(NewClampedUV);
-		Weight += SceneDepth - NewSceneDepth;
-		NearSceneDepth = min(NewSceneDepth, NearSceneDepth);
-	}
-
-	float3 SceneColor = CalcSceneColor(ClampedUV);
-
-	float SkyMask = step(NearSceneDepth, 1000000.0);
-
-	float Outline = saturate(PositiveClampedPow(Weight, Bias) * Intensity) * SkyMask;
-
-	float3 Output = lerp(SceneColor, Color, Outline);
-
-	OutColor = float4(Output, 1.0);
+    // OutColor = float4(LineColor.a * LineColor.rgb, LineColor.a);
+    OutColor = float4(0.f, 0.f, 1.f, 1.f);
+    OutDepth = Depth;
 }

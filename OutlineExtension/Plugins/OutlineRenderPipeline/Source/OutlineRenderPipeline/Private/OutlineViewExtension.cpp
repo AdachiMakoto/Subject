@@ -9,6 +9,8 @@
 #include "SceneTextureParameters.h"
 #include "DataDrivenShaderPlatformInfo.h"
 #include "OutlineSubsystem.h"
+#include "AddMyShader.h"
+
 
 DECLARE_GPU_STAT(Outline);
 
@@ -25,6 +27,7 @@ public:
 		SHADER_PARAMETER(float, Bias)
 		SHADER_PARAMETER(float, Intensity)
 		SHADER_PARAMETER(FVector3f, Color)
+		SHADER_PARAMETER(FVector4f, TestColor)
 		RENDER_TARGET_BINDING_SLOTS()
 	END_SHADER_PARAMETER_STRUCT()
 
@@ -101,6 +104,8 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		PassParameters->Color = FVector3f(FinalOutlineSettings.Color);
 		PassParameters->RenderTargets[0] = FRenderTargetBinding(OutputTexture, ERenderTargetLoadAction::EClear);
 
+		PassParameters->TestColor = FVector4f(0.0, 1.0, 0.0, 1.0);
+
 		const FScreenPassTexture BlackDummy(GSystemTextures.GetBlackDummy(GraphBuilder));
 
 		// This gets passed in whether or not it's used.
@@ -117,6 +122,25 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 			TStaticBlendState<>::GetRHI(),
 			TStaticDepthStencilState<false, CF_Always>::GetRHI(),
 			PassParameters);
+	}
+
+
+	{
+		FAddMyShaderInput addMyInputs;
+		addMyInputs.Target = (*Inputs.SceneTextures)->SceneColorTexture;
+		addMyInputs.LineWidth = 1;
+		addMyInputs.LineColor = FLinearColor(0.f, 0.f, 0.f, 1.f);
+		addMyInputs.LineTexture = nullptr;
+		addMyInputs.SceneDepth = (*Inputs.SceneTextures)->SceneDepthTexture;
+		
+		// FRenderTargetBinding(OutputTexture, ERenderTargetLoadAction::EClear);
+		// addMyInputs.SceneColor = Inputs.GetInput(EPostProcessMaterialInput::SceneColor);
+		// FVector3f(FinalOutlineSettings.Color);
+		
+		auto& inView = static_cast<const FViewInfo&>(View);
+		AddPixelPass(GraphBuilder, inView, addMyInputs);
+		// TODO : Confirmed.
+		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. #####"));
 	}
 
 	// Copy Pass
