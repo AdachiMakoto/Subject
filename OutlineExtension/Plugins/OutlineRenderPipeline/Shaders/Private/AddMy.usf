@@ -10,30 +10,46 @@
 #include "/Engine/Private/ScreenPass.ush"
 // #include "/Engine/Private/PostProcessCommon.ush"
 
-SCREEN_PASS_TEXTURE_VIEWPORT(Input)
+// SCREEN_PASS_TEXTURE_VIEWPORT(Input)
 
-Texture2D<uint> LineTexture;
-float4 LineColor;
-float MaterialThreshold;
-float DepthThreshold;
-float NormalThreshold;
-float PlanarThreshold;
-float NonLineSpecular;
-int LineWidth;
-int SearchRangeMin;
-int SearchRangeMax;
+// Texture2D<uint> LineTexture;
+// float4 LineColor;
+// float MaterialThreshold;
+// float DepthThreshold;
+// float NormalThreshold;
+// float PlanarThreshold;
+// float NonLineSpecular;
+// int LineWidth;
+// int SearchRangeMin;
+// int SearchRangeMax;
 
+void AddMyPS(FScreenVertexOutput Input, out float4 OutColor : SV_Target0)
+{
+	// クラッシュする
+	// float2 BufferUV   = Input.UV;
+	// float2 ClampedUV  = clamp(BufferUV, View.BufferBilinearUVMinMax.xy, View.BufferBilinearUVMinMax.zw);
+	// float3 SceneColor = CalcSceneColor(ClampedUV);
+	// OutColor = float4(SceneColor, 1.0);
+
+    // 動く
+    OutColor = float4(1.f, 0.f, 0.f, 1.f);
+}
+
+/*
+ * バックアップ
+ * 
 void AddMyPS(float4 SvPosition : SV_POSITION, out float4 OutColor : SV_Target0, out float OutDepth : SV_Depth)
 {
-    // int2 PixelPos = int2(SvPosition.xy);
-    float Depth = 0.f;
-    // if (!FindLine(PixelPos, Depth))
-    // {
-    //     discard;
-    //     return;
-    // }
+	// int2 PixelPos = int2(SvPosition.xy);
+	float Depth = 0.f;
+	// if (!FindLine(PixelPos, Depth))
+	// {
+	//     discard;
+	//     return;
+	// }
 
-    // OutColor = float4(LineColor.a * LineColor.rgb, LineColor.a);
-    OutColor = float4(0.f, 0.f, 1.f, 1.f);
-    OutDepth = Depth;
+	// OutColor = float4(LineColor.a * LineColor.rgb, LineColor.a);
+	OutColor = float4(0.f, 0.f, 1.f, 1.f);
+	OutDepth = Depth;
 }
+*/

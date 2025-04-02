@@ -10,6 +10,8 @@ struct FAddMyShaderInput
 	FRDGTextureRef Target;
 	FRDGTextureRef SceneDepth;
 	FRDGTextureRef LineTexture;
+	FRDGTextureRef OutputTexture;
+	TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures;
 	FLinearColor LineColor;
 	int32 LineWidth;
 };

@@ -64,13 +64,14 @@ void FOutlineViewExtension::SetupViewFamily(FSceneViewFamily& InViewFamily)
 
 void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessingInputs& Inputs)
 {
+	
 	if (!FinalOutlineSettings.Enabled)
 	{
 		return;
 	}
 
 	Inputs.Validate();
-
+	
 	const FIntRect PrimaryViewRect = static_cast<const FViewInfo&>(View).ViewRect;
 
 	// Scene color is updated incrementally through the post process pipeline.
@@ -81,7 +82,7 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 
 	const FScreenPassTextureViewport InputViewport(SceneColor);
 	const FScreenPassTextureViewport OutputViewport(InputViewport);
-
+	
 	FRDGTextureRef OutputTexture;
 	{
 		FRDGTextureDesc OutputTextureDesc = SceneColor.Texture->Desc;
@@ -89,7 +90,7 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		OutputTextureDesc.Flags |= TexCreate_RenderTargetable | TexCreate_ShaderResource;
 		OutputTexture = GraphBuilder.CreateTexture(OutputTextureDesc, TEXT("Outline.Output"));
 	}
-
+	
 	// Outline Pass
 	{
 		TShaderMapRef<FScreenVS> VertexShader(static_cast<const FViewInfo&>(View).ShaderMap);
@@ -110,7 +111,7 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 
 		// This gets passed in whether or not it's used.
 		GraphBuilder.RemoveUnusedTextureWarning(BlackDummy.Texture);
-
+		
 		AddDrawScreenPass(
 			GraphBuilder,
 			RDG_EVENT_NAME("Outline"),
@@ -122,16 +123,19 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 			TStaticBlendState<>::GetRHI(),
 			TStaticDepthStencilState<false, CF_Always>::GetRHI(),
 			PassParameters);
-	}
+	} 
 
-
+	// Add Pixel Shader
 	{
 		FAddMyShaderInput addMyInputs;
 		addMyInputs.Target = (*Inputs.SceneTextures)->SceneColorTexture;
-		addMyInputs.LineWidth = 1;
-		addMyInputs.LineColor = FLinearColor(0.f, 0.f, 0.f, 1.f);
-		addMyInputs.LineTexture = nullptr;
-		addMyInputs.SceneDepth = (*Inputs.SceneTextures)->SceneDepthTexture;
+		addMyInputs.SceneTextures = Inputs.SceneTextures;
+		addMyInputs.OutputTexture = OutputTexture;
+		
+		// addMyInputs.LineWidth = 1;
+		// addMyInputs.LineColor = FLinearColor(0.f, 0.f, 0.f, 1.f);
+		// addMyInputs.LineTexture = nullptr;
+		// addMyInputs.SceneDepth = (*Inputs.SceneTextures)->SceneDepthTexture;
 		
 		// FRenderTargetBinding(OutputTexture, ERenderTargetLoadAction::EClear);
 		// addMyInputs.SceneColor = Inputs.GetInput(EPostProcessMaterialInput::SceneColor);
@@ -142,9 +146,11 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		// TODO : Confirmed.
 		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. #####"));
 	}
-
+	
 	// Copy Pass
 	{
+		// NOTE : ここを実行すると画面がおかしくなる。『utputTexture』もしくは『SceneColor.Texture』が正しくデータが入っていない
 		AddCopyTexturePass(GraphBuilder, OutputTexture, SceneColor.Texture);
 	}
+
 }
