@@ -19,12 +19,8 @@ namespace
 
 		BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 			SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
+			SHADER_PARAMETER_STRUCT_INCLUDE(FSceneTextureShaderParameters, SceneTextures)
 			SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, Input)
-			// SHADER_PARAMETER_RDG_TEXTURE(Texture2D, LineTexture)
-			// SHADER_PARAMETER(FVector4f, LineColor)
-			// SHADER_PARAMETER(int, LineWidth)
-			// SHADER_PARAMETER(int, SearchRangeMin)
-			// SHADER_PARAMETER(int, SearchRangeMax)
 			RENDER_TARGET_BINDING_SLOTS()
 		END_SHADER_PARAMETER_STRUCT()
 	};
@@ -56,7 +52,14 @@ void AddPixelPass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMy
 		FAddMyShaderPS::FParameters* Parameters = GraphBuilder.AllocParameters<FAddMyShaderPS::FParameters>();
 		Parameters->View = View.ViewUniformBuffer;
 		Parameters->Input = GetScreenPassTextureViewportParameters(Viewport);
-		Parameters->RenderTargets[0] = FRenderTargetBinding(Inputs.OutputTexture, ERenderTargetLoadAction::EClear);
+		// NOTE : 動く
+		Parameters->SceneTextures = GetSceneTextureShaderParameters(Inputs.SceneTextures);
+		//
+		// 読み出しに前の工程で使ったテクスチャが使えれば、追加加工できるはず・・・？
+		//
+		//Parameters->SceneTextures = GetSceneTextureShaderParameters(Inputs.OutputTexture);
+		// SV_Target0(出力)
+		Parameters->RenderTargets[0] = FRenderTargetBinding(Inputs.OutputTexture, ERenderTargetLoadAction::ELoad);
 		
 		AddDrawScreenPass(
 			GraphBuilder,
@@ -67,34 +70,4 @@ void AddPixelPass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMy
 			PixelShader,
 			Parameters);
 	}
-	
-	/*
-	{
-		FAddMyShaderPS::FParameters* Parameters = GraphBuilder.AllocParameters<FAddMyShaderPS::FParameters>();
-		Parameters->View = View.ViewUniformBuffer;
-		Parameters->Input = GetScreenPassTextureViewportParameters(Viewport);
-		// Parameters->LineTexture = Inputs.LineTexture;
-		// Parameters->LineColor = Inputs.LineColor;
-		// Parameters->LineWidth = Inputs.LineWidth * Inputs.LineWidth;
-		// Parameters->SearchRangeMin = -(Inputs.LineWidth / 2);
-		// Parameters->SearchRangeMax = (Inputs.LineWidth / 2);
-		Parameters->RenderTargets[0] = FRenderTargetBinding(Inputs.Target, ERenderTargetLoadAction::ELoad);
-		// Parameters->RenderTargets.DepthStencil = FDepthStencilBinding(Inputs.SceneDepth, ERenderTargetLoadAction::ELoad, FExclusiveDepthStencil::DepthWrite_StencilNop);
-
-		FRHIBlendState* blendState = TStaticBlendState<CW_RGB, BO_Add, BF_DestColor, BF_InverseSourceAlpha>::GetRHI();
-		FRHIDepthStencilState* depthStencilState = TStaticDepthStencilState<true, CF_Always>::GetRHI();
-
-		FPixelShaderUtils::AddFullscreenPass(
-			GraphBuilder,
-			shaderMap,
-			RDG_EVENT_NAME("AddMyPS"),
-			TShaderMapRef<FAddMyShaderPS>(shaderMap),
-			Parameters,
-			Viewport.Rect,
-			blendState,
-			nullptr,
-			depthStencilState);
-	}
-	*/
-	
 }

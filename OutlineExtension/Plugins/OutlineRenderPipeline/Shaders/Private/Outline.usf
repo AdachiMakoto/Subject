@@ -54,6 +54,7 @@ void MainPS(
 	float3 Output = lerp(SceneColor, Color, Outline);
 
 	OutColor = float4(Output, 1.0);
+	
 	// Test. changed the final color.
 	// OutColor = TestColor;
 }

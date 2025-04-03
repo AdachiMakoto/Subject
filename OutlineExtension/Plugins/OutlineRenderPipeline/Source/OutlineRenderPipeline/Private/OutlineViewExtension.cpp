@@ -132,21 +132,13 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		addMyInputs.SceneTextures = Inputs.SceneTextures;
 		addMyInputs.OutputTexture = OutputTexture;
 		
-		// addMyInputs.LineWidth = 1;
-		// addMyInputs.LineColor = FLinearColor(0.f, 0.f, 0.f, 1.f);
-		// addMyInputs.LineTexture = nullptr;
-		// addMyInputs.SceneDepth = (*Inputs.SceneTextures)->SceneDepthTexture;
-		
-		// FRenderTargetBinding(OutputTexture, ERenderTargetLoadAction::EClear);
-		// addMyInputs.SceneColor = Inputs.GetInput(EPostProcessMaterialInput::SceneColor);
-		// FVector3f(FinalOutlineSettings.Color);
 		
 		auto& inView = static_cast<const FViewInfo&>(View);
 		AddPixelPass(GraphBuilder, inView, addMyInputs);
 		// TODO : Confirmed.
 		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. #####"));
 	}
-	
+
 	// Copy Pass
 	{
 		// NOTE : ここを実行すると画面がおかしくなる。『utputTexture』もしくは『SceneColor.Texture』が正しくデータが入っていない

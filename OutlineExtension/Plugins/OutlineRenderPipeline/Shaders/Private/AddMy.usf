@@ -5,34 +5,33 @@
 =============================================================================*/
 
 #include "/Engine/Private/Common.ush"
-#include "/Engine/Private/SceneTexturesCommon.ush"
 #include "/Engine/Private/DeferredShadingCommon.ush"
+#include "/Engine/Private/SceneTexturesCommon.ush"
 #include "/Engine/Private/ScreenPass.ush"
-// #include "/Engine/Private/PostProcessCommon.ush"
+#include "/Engine/Private/SceneTextureParameters.ush"
+#include "/Engine/Private/SceneData.ush"
 
-// SCREEN_PASS_TEXTURE_VIEWPORT(Input)
-
-// Texture2D<uint> LineTexture;
-// float4 LineColor;
-// float MaterialThreshold;
-// float DepthThreshold;
-// float NormalThreshold;
-// float PlanarThreshold;
-// float NonLineSpecular;
-// int LineWidth;
-// int SearchRangeMin;
-// int SearchRangeMax;
 
 void AddMyPS(FScreenVertexOutput Input, out float4 OutColor : SV_Target0)
 {
-	// クラッシュする
+	//　基本的なUVからピクセルの取り出し
+	// SceneTextureLookupは、カスタムノードしか使えない？っぽい
+	// float4 Color = SceneTextureLookup(Input.UV, 14, false);
+	// FSceneTextureParameters SceneTextures = GetSceneTextureParameters();
+	// OutColor = SceneColorTexture.SampleLevel(InputTexture, UV, 0);
+	// OutColor = InputTexture.SampleLevel(InputTexture, Input.UV, 0);
+	// OutColor = Color;
+
+	// XXX : そのまま出力するがかなり遠回りなやり方
 	// float2 BufferUV   = Input.UV;
 	// float2 ClampedUV  = clamp(BufferUV, View.BufferBilinearUVMinMax.xy, View.BufferBilinearUVMinMax.zw);
 	// float3 SceneColor = CalcSceneColor(ClampedUV);
-	// OutColor = float4(SceneColor, 1.0);
+	// XXX : エラーがかなり出てるが動く・・・？
+	float3 SceneColor = CalcSceneColor(Input.UV);
+	OutColor = float4(SceneColor.r, SceneColor.g, SceneColor.b, 1.0);
 
     // 動く
-    OutColor = float4(1.f, 0.f, 0.f, 1.f);
+    // OutColor = float4(1.f, 0.f, 0.f, 0.5f);
 }
 
 /*
