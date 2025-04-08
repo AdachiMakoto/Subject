@@ -11,6 +11,8 @@
 #include "/Engine/Private/SceneTextureParameters.ush"
 #include "/Engine/Private/SceneData.ush"
 
+Texture2D<float4> SceneColorTexture;
+SamplerState SceneColorSampler;
 
 void AddMyPS(FScreenVertexOutput Input, out float4 OutColor : SV_Target0)
 {
@@ -22,13 +24,22 @@ void AddMyPS(FScreenVertexOutput Input, out float4 OutColor : SV_Target0)
 	// OutColor = InputTexture.SampleLevel(InputTexture, Input.UV, 0);
 	// OutColor = Color;
 
+	// TODO : OutputTexture を出力できる
+	float4 sceneColor = Texture2DSample(SceneColorTexture, SceneColorSampler, Input.UV);
+	OutColor = float4(sceneColor.r, sceneColor.g, sceneColor.b, 1.0);
+	// Texture2DSampleLevel(BlurredColorTexture, GlobalBilinearClampedSampler, ViewportUV, 0);
+	// OutColor = Texture2DSample(PostprocessInput0, PostprocessInput0Sampler, InUV.xy);
+
+	
 	// XXX : そのまま出力するがかなり遠回りなやり方
 	// float2 BufferUV   = Input.UV;
 	// float2 ClampedUV  = clamp(BufferUV, View.BufferBilinearUVMinMax.xy, View.BufferBilinearUVMinMax.zw);
 	// float3 SceneColor = CalcSceneColor(ClampedUV);
+	
 	// XXX : エラーがかなり出てるが動く・・・？
-	float3 SceneColor = CalcSceneColor(Input.UV);
-	OutColor = float4(SceneColor.r, SceneColor.g, SceneColor.b, 1.0);
+	// float3 SceneColor = CalcSceneColor(Input.UV);
+	// SceneColor *= float3(0.f, 0.01f, 0.f);
+	// OutColor = float4(SceneColor.r, SceneColor.g, SceneColor.b, 1.0);
 
     // 動く
     // OutColor = float4(1.f, 0.f, 0.f, 0.5f);

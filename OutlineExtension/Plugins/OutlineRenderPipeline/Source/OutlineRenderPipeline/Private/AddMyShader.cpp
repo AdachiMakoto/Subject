@@ -21,6 +21,8 @@ namespace
 			SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
 			SHADER_PARAMETER_STRUCT_INCLUDE(FSceneTextureShaderParameters, SceneTextures)
 			SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, Input)
+			SHADER_PARAMETER_RDG_TEXTURE(Texture2D, SceneColorTexture)
+			SHADER_PARAMETER_SAMPLER(SamplerState, SceneColorSampler)
 			RENDER_TARGET_BINDING_SLOTS()
 		END_SHADER_PARAMETER_STRUCT()
 	};
@@ -54,13 +56,14 @@ void AddPixelPass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMy
 		Parameters->Input = GetScreenPassTextureViewportParameters(Viewport);
 		// NOTE : 動く
 		Parameters->SceneTextures = GetSceneTextureShaderParameters(Inputs.SceneTextures);
+		Parameters->SceneColorTexture =  Inputs.OutputTexture;
+		Parameters->SceneColorSampler = TStaticSamplerState<SF_Point>::GetRHI();
 		//
 		// 読み出しに前の工程で使ったテクスチャが使えれば、追加加工できるはず・・・？
 		//
 		//Parameters->SceneTextures = GetSceneTextureShaderParameters(Inputs.OutputTexture);
 		// SV_Target0(出力)
 		Parameters->RenderTargets[0] = FRenderTargetBinding(Inputs.OutputTexture, ERenderTargetLoadAction::ELoad);
-		
 		AddDrawScreenPass(
 			GraphBuilder,
 			RDG_EVENT_NAME("AddMyPS"),
