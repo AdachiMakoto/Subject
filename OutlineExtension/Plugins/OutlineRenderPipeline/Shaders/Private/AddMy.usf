@@ -26,6 +26,7 @@ void AddMyPS(FScreenVertexOutput Input, out float4 OutColor : SV_Target0)
 
 	// TODO : OutputTexture を出力できる
 	float4 sceneColor = Texture2DSample(SceneColorTexture, SceneColorSampler, Input.UV);
+	sceneColor *= float4(0.5f, 1.0f, 1.0f, 1.0f);
 	OutColor = float4(sceneColor.r, sceneColor.g, sceneColor.b, 1.0);
 	// Texture2DSampleLevel(BlurredColorTexture, GlobalBilinearClampedSampler, ViewportUV, 0);
 	// OutColor = Texture2DSample(PostprocessInput0, PostprocessInput0Sampler, InUV.xy);
