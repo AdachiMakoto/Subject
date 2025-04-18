@@ -139,6 +139,16 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. #####"));
 	}
 
+	// Add Compute Shader
+	{
+		FAddMyShaderInput addMyInputCS;
+		addMyInputCS.InputTexture = (*Inputs.SceneTextures)->SceneColorTexture;
+		addMyInputCS.OutputTexture = OutputTexture;
+
+		auto& inView = static_cast<const FViewInfo&>(View);
+		AddComputePass(GraphBuilder, inView, addMyInputCS);
+	}
+
 	// Copy Pass
 	{
 		// NOTE : ここを実行すると画面がおかしくなる。『utputTexture』もしくは『SceneColor.Texture』が正しくデータが入っていない

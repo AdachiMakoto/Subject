@@ -6,11 +6,30 @@
 #include "ShaderParameterStruct.h"
 #include "DataDrivenShaderPlatformInfo.h"
 
-
+//  GPU パフォーマンスの統計を記録・表示するためのマクロ
+DECLARE_GPU_STAT(AddMyCS);
 DECLARE_GPU_STAT(AddMyPS);
 
 namespace
 {
+	class FAddMyShaderCS : public FGlobalShader
+	{
+	public:
+		DECLARE_GLOBAL_SHADER(FAddMyShaderCS);
+		SHADER_USE_PARAMETER_STRUCT(FAddMyShaderCS, FGlobalShader);
+
+		BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
+			SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
+			SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, Input)
+			SHADER_PARAMETER_RDG_TEXTURE(Texture2D, InputTexture)
+			SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D, OutputTexture)
+		END_SHADER_PARAMETER_STRUCT()
+	};
+
+	IMPLEMENT_GLOBAL_SHADER(FAddMyShaderCS, "/Plugin/OutlineRenderPipeline/Private/AddMy.usf", "AddMyCS", SF_Compute);
+
+	
+
 	class FAddMyShaderPS : public FGlobalShader
 	{
 	public:
@@ -32,6 +51,36 @@ namespace
 		return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5) || IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM6);
 	}
 	IMPLEMENT_GLOBAL_SHADER(FAddMyShaderPS, "/Plugin/OutlineRenderPipeline/Private/AddMy.usf", "AddMyPS", SF_Pixel);
+}
+
+void AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMyShaderInput& Inputs)
+{
+	RDG_EVENT_SCOPE(GraphBuilder, "AddComputePass");
+	FGlobalShaderMap* shaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
+	FScreenPassTextureViewport viewport = FScreenPassTextureViewport(View.ViewRect);
+	
+	FRDGTextureRef myTexture{};
+	{
+		FRDGTextureDesc desc = FRDGTextureDesc::Create2D(viewport.Extent, PF_R32_UINT, FClearValueBinding::Black, TexCreate_ShaderResource | TexCreate_UAV);
+		myTexture = GraphBuilder.CreateTexture(desc, TEXT("myTexture"));
+		FRDGTextureUAVRef myTextureUAV = GraphBuilder.CreateUAV(myTexture);
+		AddClearUAVPass(GraphBuilder, myTextureUAV, (UE::HLSL::float4)0);
+
+		FAddMyShaderCS::FParameters* parameters = GraphBuilder.AllocParameters<FAddMyShaderCS::FParameters>();
+		parameters->View = View.ViewUniformBuffer;
+		parameters->Input = GetScreenPassTextureViewportParameters(viewport);
+		parameters->InputTexture = Inputs.OutputTexture;
+		parameters->OutputTexture = myTextureUAV;
+
+		TShaderMapRef<FAddMyShaderCS> computeShader(shaderMap);
+		// numthreads(8,8,1) * FIntPoint(8,8) = 1024スレッド
+		FComputeShaderUtils::AddPass(
+			GraphBuilder,
+			RDG_EVENT_NAME("AddMyCS"),
+			computeShader,
+			parameters,
+			FComputeShaderUtils::GetGroupCount(viewport.Rect.Size(), FIntPoint(8, 8)));
+	}	
 }
 
 void AddPixelPass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMyShaderInput& Inputs)

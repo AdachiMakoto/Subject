@@ -11,6 +11,29 @@
 #include "/Engine/Private/SceneTextureParameters.ush"
 #include "/Engine/Private/SceneData.ush"
 
+
+//----------------------------------------------------------------------
+//
+// Compute shader
+//
+//----------------------------------------------------------------------
+
+RWTexture2D<float4> OutputTexture;
+Texture2D<float4> InputTexture;
+
+[numthreads(8,8,1)]
+void AddMyCS(uint2 id : SV_DispatchThreadID)
+{
+	float4 t = InputTexture[id];
+	OutputTexture[id] = t;
+}
+
+
+//----------------------------------------------------------------------
+//
+// Pixel shader
+//
+//----------------------------------------------------------------------
 Texture2D<float4> SceneColorTexture;
 SamplerState SceneColorSampler;
 
