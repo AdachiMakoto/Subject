@@ -68,22 +68,3 @@ void AddMyPS(FScreenVertexOutput Input, out float4 OutColor : SV_Target0)
     // 動く
     // OutColor = float4(1.f, 0.f, 0.f, 0.5f);
 }
-
-/*
- * バックアップ
- * 
-void AddMyPS(float4 SvPosition : SV_POSITION, out float4 OutColor : SV_Target0, out float OutDepth : SV_Depth)
-{
-	// int2 PixelPos = int2(SvPosition.xy);
-	float Depth = 0.f;
-	// if (!FindLine(PixelPos, Depth))
-	// {
-	//     discard;
-	//     return;
-	// }
-
-	// OutColor = float4(LineColor.a * LineColor.rgb, LineColor.a);
-	OutColor = float4(0.f, 0.f, 1.f, 1.f);
-	OutDepth = Depth;
-}
-*/
