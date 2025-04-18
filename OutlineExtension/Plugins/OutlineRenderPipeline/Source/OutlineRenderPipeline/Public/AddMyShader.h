@@ -5,15 +5,21 @@
 #include "ScreenPass.h"
 
 
-struct FAddMyShaderInput
+struct FAddMyShaderCSInput
 {
 	FRDGTextureRef Target;
-	FRDGTextureRef SceneDepth;
 	FRDGTextureRef InputTexture;
 	FRDGTextureRef OutputTexture;
+	FRDGTextureRef OtherTexture;
 	TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures;
 	FScreenPassTexture SceneColor;
 };
 
-void AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMyShaderInput& Inputs);
-void AddPixelPass(FRDGBuilder& GraphBuilder, const FViewInfo& Vuew, const FAddMyShaderInput& Inputs);
+struct FAddMyShaderPSInput
+{
+	FRDGTextureRef OutputTexture;
+	TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures;
+};
+
+// void AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMyShaderCSInput& Inputs);
+void AddPixelPass(FRDGBuilder& GraphBuilder, const FViewInfo& Vuew, const FAddMyShaderPSInput& Inputs);

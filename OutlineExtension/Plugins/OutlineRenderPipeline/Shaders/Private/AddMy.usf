@@ -21,11 +21,14 @@
 RWTexture2D<float4> OutputTexture;
 Texture2D<float4> InputTexture;
 
-[numthreads(8,8,1)]
+[numthreads(16,16,1)]
 void AddMyCS(uint2 id : SV_DispatchThreadID)
 {
 	float4 t = InputTexture[id];
+	// t *= float4(1.0f, 0.5f, 1.0f, 1.0f);
+	// // t = float4(1.0f, 0.5f, 1.0f, 1.0f);
 	OutputTexture[id] = t;
+	// OutputTexture[id] = float4(0.0f, 1.0f, 0.0f, 1.0f);
 }
 
 

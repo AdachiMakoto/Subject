@@ -64,6 +64,13 @@ void FOutlineViewExtension::SetupViewFamily(FSceneViewFamily& InViewFamily)
 
 void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessingInputs& Inputs)
 {
+	/*
+	 * FPostProcessingInputs& Inputs の中身
+	 * TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures・・・ポストプロセスをかけるのバッファ
+	 * FRDGTextureRef ViewFamilyTexture・・・ポストプロセスチェーンの入力として使われるテクスチャ情報        // 白っぽい画面になる？
+	 * FRDGTextureRef CustomDepthTexture・・・カスタムデプス（深度）バッファ                            // 正しく表示されない？
+	 * FRDGTextureRef ExposureIlluminance・・・シーンの自動露出（Auto Exposure）や明るさの解析に関する情報 // クラッシュする
+	 */
 	
 	if (!FinalOutlineSettings.Enabled)
 	{
@@ -125,30 +132,33 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 			PassParameters);
 	} 
 
+	// Add Compute Shader
+/*
+	{
+		FAddMyShaderInput addMyInputCS;
+		addMyInputCS.Target = (*Inputs.SceneTextures)->SceneColorTexture;
+		// addMyInputCS.InputTexture = (*Inputs.SceneTextures)->SceneColorTexture;
+		addMyInputCS.OutputTexture = OutputTexture;
+
+		auto& inView = static_cast<const FViewInfo&>(View);
+		AddComputePass(GraphBuilder, inView, addMyInputCS);
+		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. aaaaaaaaaaa #####"));
+	}
+	*/
+
 	// Add Pixel Shader
 	{
-		FAddMyShaderInput addMyInputs;
-		addMyInputs.Target = (*Inputs.SceneTextures)->SceneColorTexture;
+		FAddMyShaderPSInput addMyInputs;
+		// addMyInputs.Target = (*Inputs.SceneTextures)->SceneColorTexture;
 		addMyInputs.SceneTextures = Inputs.SceneTextures;
 		addMyInputs.OutputTexture = OutputTexture;
-		
 		
 		auto& inView = static_cast<const FViewInfo&>(View);
 		AddPixelPass(GraphBuilder, inView, addMyInputs);
 		// TODO : Confirmed.
 		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. #####"));
 	}
-
-	// Add Compute Shader
-	{
-		FAddMyShaderInput addMyInputCS;
-		addMyInputCS.InputTexture = (*Inputs.SceneTextures)->SceneColorTexture;
-		addMyInputCS.OutputTexture = OutputTexture;
-
-		auto& inView = static_cast<const FViewInfo&>(View);
-		AddComputePass(GraphBuilder, inView, addMyInputCS);
-	}
-
+	
 	// Copy Pass
 	{
 		// NOTE : ここを実行すると画面がおかしくなる。『utputTexture』もしくは『SceneColor.Texture』が正しくデータが入っていない
