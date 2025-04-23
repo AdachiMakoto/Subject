@@ -27,8 +27,8 @@ void AddMyCS(uint2 id : SV_DispatchThreadID)
 	float4 t = InputTexture[id];
 	// t *= float4(1.0f, 0.5f, 1.0f, 1.0f);
 	// // t = float4(1.0f, 0.5f, 1.0f, 1.0f);
-	OutputTexture[id] = t;
-	// OutputTexture[id] = float4(0.0f, 1.0f, 0.0f, 1.0f);
+	// OutputTexture[id] = t;
+	OutputTexture[id] = float4(0.0f, 1.0f, 0.0f, 1.0f);
 }
 
 

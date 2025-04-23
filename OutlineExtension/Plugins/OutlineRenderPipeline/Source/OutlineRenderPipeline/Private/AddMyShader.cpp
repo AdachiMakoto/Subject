@@ -6,6 +6,8 @@
 #include "ShaderParameterStruct.h"
 #include "DataDrivenShaderPlatformInfo.h"
 #include "RenderTargetPool.h"
+#include "PostProcess/PostProcessMaterialInputs.h"
+#include "PostProcess/PostProcessing.h"
 
 //  GPU パフォーマンスの統計を記録・表示するためのマクロ
 DECLARE_GPU_STAT(AddMyCS);
@@ -59,114 +61,34 @@ namespace
 	IMPLEMENT_GLOBAL_SHADER(FAddMyShaderPS, "/Plugin/OutlineRenderPipeline/Private/AddMy.usf", "AddMyPS", SF_Pixel);
 }
 
-/*
-void AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMyShaderCSInput& Inputs)
+
+FRDGTextureRef AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMyShaderCSInput& Inputs)
 {
-	// ComputeShaderだけで反映させる
-	ENQUEUE_RENDER_COMMAND(ComputeShaderPass)(
-		[View, Inputs](FRHICommandListImmediate& RHICmdList)
-		{
-			FRDGBuilder GraphBuilder(RHICmdList);
+	FIntPoint Resolution = View.ViewRect.Size();
 
-			const FIntPoint Size = FIntPoint(View.ViewRect.Width(), View.ViewRect.Height());
-
-			// RDG用出力テクスチャを作成
-			FRDGTextureRef OutputTexture = GraphBuilder.CreateTexture(
-				FRDGTextureDesc::Create2D(
-					Size,
-					PF_FloatRGBA,
-					FClearValueBinding::None,
-					TexCreate_ShaderResource | TexCreate_UAV | TexCreate_RenderTargetable
-				),
-				TEXT("AddMyCSOutput")
-			);
-
-			// UAVパラメータ
-			FScreenPassTextureViewport viewport = FScreenPassTextureViewport(View.ViewRect);
-			FAddMyShaderCS::FParameters* Parameters = GraphBuilder.AllocParameters<FAddMyShaderCS::FParameters>();
-			Parameters->OutputTexture = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(OutputTexture));
-			Parameters->Input = GetScreenPassTextureViewportParameters(viewport);
-			Parameters->InputTexture = Inputs.Target;
-			Parameters->OutputTexture = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(OutputTexture));
-
-			// シェーダー取得
-			TShaderMapRef<FAddMyShaderCS> ComputeShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
-
-			// パス登録
-			FComputeShaderUtils::AddPass(
-				GraphBuilder,
-				RDG_EVENT_NAME("AddMyCS"),
-				ComputeShader,
-				Parameters,
-				FIntVector(Size.X / 8, Size.Y / 8, 1)
-			);
-
-			// 結果を外部テクスチャとして取り出す
-			TRefCountPtr<IPooledRenderTarget> PooledOutput;
-			GraphBuilder.QueueTextureExtraction(OutputTexture, &PooledOutput);
-
-			GraphBuilder.Execute();
-
-			// RenderTarget へコピー
-			FTexture2DRHIRef OutputRHI = PooledOutput->GetRenderTargetItem().ShaderResourceTexture;
-			// FRHITexture* DestTexture = RenderTarget->GetRenderTargetResource()->GetRenderTargetTexture();
-	
-			RHICmdList.CopyTexture(OutputRHI, Inputs.OutputTexture, FRHICopyTextureInfo());
-		});
-	
-	/ *
-	RDG_EVENT_SCOPE(GraphBuilder, "AddComputePass");
-	FGlobalShaderMap* shaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
 	FScreenPassTextureViewport viewport = FScreenPassTextureViewport(View.ViewRect);
-	
-	 FRDGTextureRef myTexture;
-	{
-		FRDGTextureDesc desc = FRDGTextureDesc::Create2D(viewport.Extent, PF_R32_UINT, FClearValueBinding::Black, TexCreate_ShaderResource | TexCreate_UAV);
-		myTexture = GraphBuilder.CreateTexture(desc, TEXT("myTexture"));
-		// FRDGTextureUAVRef myTextureUAV = GraphBuilder.CreateUAV(myTexture);
-		// AddClearUAVPass(GraphBuilder, myTextureUAV, (UE::HLSL::float4)0);
+	FRDGTextureDesc desc = FRDGTextureDesc::Create2D(viewport.Extent, PF_R32_UINT, FClearValueBinding::Black, TexCreate_ShaderResource | TexCreate_UAV);
+	FRDGTextureRef outputTexture = GraphBuilder.CreateTexture(desc, TEXT("myTexture"));
 
-		FAddMyShaderCS::FParameters* parameters = GraphBuilder.AllocParameters<FAddMyShaderCS::FParameters>();
-		// parameters->View = View.ViewUniformBuffer;
-		parameters->Input = GetScreenPassTextureViewportParameters(viewport);
-		// parameters->InputTexture = Inputs.OutputTexture;
-		parameters->InputTexture = Inputs.Target;
-		// Error : Attempted to create UAV from texture Outline.Output which was not created with TexCreate_UAV
-		// parameters->OutputTexture = GraphBuilder.CreateUAV(FRDGTextureUAVDesc((Inputs.OutputTexture)));
-		// エラーは出ないが正しく動かない
-		parameters->OutputTexture = GraphBuilder.CreateUAV(Inputs.Target);
-		// Test
-		parameters->OutputTexture = GraphBuilder.CreateUAV(myTexture);
-		// parameters->OutputTexture = myTextureUAV;
+	FGlobalShaderMap* shaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
+	TShaderMapRef<FAddMyShaderCS> computeShader(shaderMap);
 
-		TShaderMapRef<FAddMyShaderCS> computeShader(shaderMap);
-		// numthreads(8,8,1) * FIntPoint(8,8) = 1024スレッド
-		FComputeShaderUtils::AddPass(
-			GraphBuilder,
-			RDG_EVENT_NAME("AddMyCS"),
-			computeShader,
-			parameters,
-			FComputeShaderUtils::GetGroupCount(viewport.Rect.Size(),
-			FIntPoint(16, 16)));
-		
-		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. bbbbbbbbbbb #####"));
-	}
-	* /
+	FAddMyShaderCS::FParameters* parameters = GraphBuilder.AllocParameters<FAddMyShaderCS::FParameters>();
+	parameters->Input = GetScreenPassTextureViewportParameters(viewport);
+	// parameters->InputTexture = Inputs.Target;
+	// parameters->OutputTexture = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(outputTexture));
+	parameters->OutputTexture = GraphBuilder.CreateUAV(Inputs.Target);
+
+	FComputeShaderUtils::AddPass(
+		GraphBuilder,
+		RDG_EVENT_NAME("AddMyCS"),
+		computeShader,
+		parameters,
+		FComputeShaderUtils::GetGroupCount(viewport.Rect.Size(),
+		FIntPoint(16, 16)));
 	
-	//
-	// バッファのコピー
-	//
-	// RDGの外へ出す
-	// TRefCountPtr<IPooledRenderTarget> PooledOutput;
-	// GraphBuilder.QueueTextureExtraction(myTexture, &PooledOutput);
-	// RDGの実行
-	// GraphBuilder.Execute();
-	// 外部で RHITexture を取り出す
-	// FTexture2DRHIRef OutputRHI = PooledOutput->GetRenderTargetItem().ShaderResourceTexture;
-	// Copy to UTextureRenderTarget2D
-	// CopyRDGOutputToRenderTarget(MyRenderTarget, OutputRHI);
-}
-*/
+	return outputTexture;
+} 
 
 
 void AddPixelPass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMyShaderPSInput& Inputs)

@@ -10,9 +10,13 @@ struct FAddMyShaderCSInput
 	FRDGTextureRef Target;
 	FRDGTextureRef InputTexture;
 	FRDGTextureRef OutputTexture;
-	FRDGTextureRef OtherTexture;
-	TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures;
+	// FRDGTextureRef OtherTexture;
+	// TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures;
 	FScreenPassTexture SceneColor;
+	FIntPoint ViewRect;
+	// FScreenPassTexture& InOutSceneColor;
+
+	// FAddMyShaderCSInput() {}
 };
 
 struct FAddMyShaderPSInput
@@ -21,5 +25,5 @@ struct FAddMyShaderPSInput
 	TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures;
 };
 
-// void AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMyShaderCSInput& Inputs);
+FRDGTextureRef AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMyShaderCSInput& Inputs);
 void AddPixelPass(FRDGBuilder& GraphBuilder, const FViewInfo& Vuew, const FAddMyShaderPSInput& Inputs);

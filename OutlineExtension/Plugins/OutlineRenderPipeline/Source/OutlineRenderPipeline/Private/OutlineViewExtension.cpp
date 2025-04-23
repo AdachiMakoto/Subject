@@ -133,31 +133,32 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 	} 
 
 	// Add Compute Shader
-/*
 	{
-		FAddMyShaderInput addMyInputCS;
+		FAddMyShaderCSInput addMyInputCS;
 		addMyInputCS.Target = (*Inputs.SceneTextures)->SceneColorTexture;
 		// addMyInputCS.InputTexture = (*Inputs.SceneTextures)->SceneColorTexture;
 		addMyInputCS.OutputTexture = OutputTexture;
+		// addMyInputCS.InOutSceneColor = Inputs.Scene;
 
 		auto& inView = static_cast<const FViewInfo&>(View);
-		AddComputePass(GraphBuilder, inView, addMyInputCS);
+		FRDGTextureRef output =  AddComputePass(GraphBuilder, inView, addMyInputCS);
 		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. aaaaaaaaaaa #####"));
-	}
-	*/
+	} 
 
+	
 	// Add Pixel Shader
 	{
-		FAddMyShaderPSInput addMyInputs;
+		FAddMyShaderPSInput addMyInputsPS;
 		// addMyInputs.Target = (*Inputs.SceneTextures)->SceneColorTexture;
-		addMyInputs.SceneTextures = Inputs.SceneTextures;
-		addMyInputs.OutputTexture = OutputTexture;
+		addMyInputsPS.SceneTextures = Inputs.SceneTextures;
+		addMyInputsPS.OutputTexture = OutputTexture;
 		
 		auto& inView = static_cast<const FViewInfo&>(View);
-		AddPixelPass(GraphBuilder, inView, addMyInputs);
+		AddPixelPass(GraphBuilder, inView, addMyInputsPS);
 		// TODO : Confirmed.
 		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. #####"));
 	}
+	
 	
 	// Copy Pass
 	{
