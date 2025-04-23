@@ -15,14 +15,26 @@ DECLARE_GPU_STAT(AddMyPS);
 
 namespace
 {
+	enum EValueType
+	{
+		Color,
+		Normal,
+		Material,
+		MAX
+	};
+	class FValueType : SHADER_PERMUTATION_ENUM_CLASS("VALUE_TYPE", EValueType);
+	using FCommonDomain = TShaderPermutationDomain<FValueType>;
+	
 	class FAddMyShaderCS : public FGlobalShader
 	{
 	public:
 		DECLARE_GLOBAL_SHADER(FAddMyShaderCS);
 		SHADER_USE_PARAMETER_STRUCT(FAddMyShaderCS, FGlobalShader);
+		
+		using FPermutationDomain = FCommonDomain;
 
 		BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-			// SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
+			SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
 			SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, Input)
 			SHADER_PARAMETER_RDG_TEXTURE(Texture2D, InputTexture)
 			SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D, OutputTexture)
@@ -67,18 +79,36 @@ FRDGTextureRef AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, 
 	FIntPoint Resolution = View.ViewRect.Size();
 
 	FScreenPassTextureViewport viewport = FScreenPassTextureViewport(View.ViewRect);
-	FRDGTextureDesc desc = FRDGTextureDesc::Create2D(viewport.Extent, PF_R32_UINT, FClearValueBinding::Black, TexCreate_ShaderResource | TexCreate_UAV);
+	FRDGTextureDesc desc = FRDGTextureDesc::Create2D(Inputs.Target->Desc.Extent, PF_A32B32G32R32F, FClearValueBinding::None, TexCreate_ShaderResource | TexCreate_UAV);
 	FRDGTextureRef outputTexture = GraphBuilder.CreateTexture(desc, TEXT("myTexture"));
 
 	FGlobalShaderMap* shaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
-	TShaderMapRef<FAddMyShaderCS> computeShader(shaderMap);
+	// TShaderMapRef<FAddMyShaderCS> computeShader(shaderMap);
 
 	FAddMyShaderCS::FParameters* parameters = GraphBuilder.AllocParameters<FAddMyShaderCS::FParameters>();
+	parameters->View = View.ViewUniformBuffer;
 	parameters->Input = GetScreenPassTextureViewportParameters(viewport);
-	// parameters->InputTexture = Inputs.Target;
-	// parameters->OutputTexture = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(outputTexture));
+	parameters->InputTexture = Inputs.Target;
+	// 出力は、(*Inputs.SceneTextures)->SceneColorTexture に対して行う
 	parameters->OutputTexture = GraphBuilder.CreateUAV(Inputs.Target);
+	// outputTexture(出力バッファ)に書き込むとおかしくなる
+	// parameters->OutputTexture = GraphBuilder.CreateUAV(outputTexture);
 
+	FCommonDomain PermutationVector{};
+	PermutationVector.Set<FValueType>(EValueType::Color);
+	
+	FComputeShaderUtils::AddPass(
+		GraphBuilder,
+		RDG_EVENT_NAME("AddMyCS"),
+		TShaderMapRef<FAddMyShaderCS>(shaderMap, PermutationVector),
+		parameters,
+		FComputeShaderUtils::GetGroupCount(viewport.Rect.Size(),
+			FIntPoint(16, 16))
+			);
+
+	/*
+	 * 結果が反映されない
+	 * 
 	FComputeShaderUtils::AddPass(
 		GraphBuilder,
 		RDG_EVENT_NAME("AddMyCS"),
@@ -86,6 +116,7 @@ FRDGTextureRef AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, 
 		parameters,
 		FComputeShaderUtils::GetGroupCount(viewport.Rect.Size(),
 		FIntPoint(16, 16)));
+		*/
 	
 	return outputTexture;
 } 

@@ -97,7 +97,8 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		OutputTextureDesc.Flags |= TexCreate_RenderTargetable | TexCreate_ShaderResource;
 		OutputTexture = GraphBuilder.CreateTexture(OutputTextureDesc, TEXT("Outline.Output"));
 	}
-	
+
+	/*
 	// Outline Pass
 	{
 		TShaderMapRef<FScreenVS> VertexShader(static_cast<const FViewInfo&>(View).ShaderMap);
@@ -130,7 +131,9 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 			TStaticBlendState<>::GetRHI(),
 			TStaticDepthStencilState<false, CF_Always>::GetRHI(),
 			PassParameters);
-	} 
+	}
+	*/
+
 
 	// Add Compute Shader
 	{
@@ -145,7 +148,7 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. aaaaaaaaaaa #####"));
 	} 
 
-	
+	/*
 	// Add Pixel Shader
 	{
 		FAddMyShaderPSInput addMyInputsPS;
@@ -158,12 +161,14 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		// TODO : Confirmed.
 		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. #####"));
 	}
+	*/
 	
 	
 	// Copy Pass
 	{
 		// NOTE : ここを実行すると画面がおかしくなる。『utputTexture』もしくは『SceneColor.Texture』が正しくデータが入っていない
-		AddCopyTexturePass(GraphBuilder, OutputTexture, SceneColor.Texture);
+		// NOTE : コンピュートシェーダで使用すると、画面が壊れる
+		// AddCopyTexturePass(GraphBuilder, OutputTexture, SceneColor.Texture);
 	}
 
 }
