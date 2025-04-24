@@ -98,7 +98,7 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		OutputTexture = GraphBuilder.CreateTexture(OutputTextureDesc, TEXT("Outline.Output"));
 	}
 
-	/*
+	
 	// Outline Pass
 	{
 		TShaderMapRef<FScreenVS> VertexShader(static_cast<const FViewInfo&>(View).ShaderMap);
@@ -111,7 +111,9 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		PassParameters->Bias = FinalOutlineSettings.Bias;
 		PassParameters->Intensity = FinalOutlineSettings.Intensity;
 		PassParameters->Color = FVector3f(FinalOutlineSettings.Color);
-		PassParameters->RenderTargets[0] = FRenderTargetBinding(OutputTexture, ERenderTargetLoadAction::EClear);
+		// PassParameters->RenderTargets[0] = FRenderTargetBinding(OutputTexture, ERenderTargetLoadAction::EClear);
+		// 書き込めた
+		PassParameters->RenderTargets[0] = FRenderTargetBinding(SceneColor.Texture, ERenderTargetLoadAction::ELoad);
 
 		PassParameters->TestColor = FVector4f(0.0, 1.0, 0.0, 1.0);
 
@@ -132,15 +134,17 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 			TStaticDepthStencilState<false, CF_Always>::GetRHI(),
 			PassParameters);
 	}
-	*/
+	
 
 
 	// Add Compute Shader
 	{
 		FAddMyShaderCSInput addMyInputCS;
 		addMyInputCS.Target = (*Inputs.SceneTextures)->SceneColorTexture;
+		addMyInputCS.OutputTexture = SceneColor.Texture;
+		// addMyInputCS.Target = SceneColor.Texture;
 		// addMyInputCS.InputTexture = (*Inputs.SceneTextures)->SceneColorTexture;
-		addMyInputCS.OutputTexture = OutputTexture;
+		// addMyInputCS.OutputTexture = OutputTexture;
 		// addMyInputCS.InOutSceneColor = Inputs.Scene;
 
 		auto& inView = static_cast<const FViewInfo&>(View);

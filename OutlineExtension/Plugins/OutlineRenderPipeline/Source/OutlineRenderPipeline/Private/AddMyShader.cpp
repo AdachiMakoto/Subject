@@ -88,7 +88,9 @@ FRDGTextureRef AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, 
 	FAddMyShaderCS::FParameters* parameters = GraphBuilder.AllocParameters<FAddMyShaderCS::FParameters>();
 	parameters->View = View.ViewUniformBuffer;
 	parameters->Input = GetScreenPassTextureViewportParameters(viewport);
-	parameters->InputTexture = Inputs.Target;
+	// Test
+	parameters->InputTexture = Inputs.OutputTexture;
+	// parameters->InputTexture = Inputs.Target;
 	// 出力は、(*Inputs.SceneTextures)->SceneColorTexture に対して行う
 	parameters->OutputTexture = GraphBuilder.CreateUAV(Inputs.Target);
 	// outputTexture(出力バッファ)に書き込むとおかしくなる
