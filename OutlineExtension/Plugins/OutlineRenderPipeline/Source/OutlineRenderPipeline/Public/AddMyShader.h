@@ -10,13 +10,6 @@ struct FAddMyShaderCSInput
 	FRDGTextureRef Target;
 	FRDGTextureRef InputTexture;
 	FRDGTextureRef OutputTexture;
-	// FRDGTextureRef OtherTexture;
-	// TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures;
-	FScreenPassTexture SceneColor;
-	FIntPoint ViewRect;
-	// FScreenPassTexture& InOutSceneColor;
-
-	// FAddMyShaderCSInput() {}
 };
 
 struct FAddMyShaderPSInput

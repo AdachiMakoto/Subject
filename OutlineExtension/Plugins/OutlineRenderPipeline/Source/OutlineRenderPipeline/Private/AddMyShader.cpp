@@ -15,24 +15,12 @@ DECLARE_GPU_STAT(AddMyPS);
 
 namespace
 {
-	enum EValueType
-	{
-		Color,
-		Normal,
-		Material,
-		MAX
-	};
-	class FValueType : SHADER_PERMUTATION_ENUM_CLASS("VALUE_TYPE", EValueType);
-	using FCommonDomain = TShaderPermutationDomain<FValueType>;
-	
 	class FAddMyShaderCS : public FGlobalShader
 	{
 	public:
 		DECLARE_GLOBAL_SHADER(FAddMyShaderCS);
 		SHADER_USE_PARAMETER_STRUCT(FAddMyShaderCS, FGlobalShader);
 		
-		using FPermutationDomain = FCommonDomain;
-
 		BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 			SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
 			SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, Input)
@@ -83,34 +71,21 @@ FRDGTextureRef AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, 
 	FRDGTextureRef outputTexture = GraphBuilder.CreateTexture(desc, TEXT("myTexture"));
 
 	FGlobalShaderMap* shaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
-	// TShaderMapRef<FAddMyShaderCS> computeShader(shaderMap);
+	TShaderMapRef<FAddMyShaderCS> computeShader(shaderMap);
 
 	FAddMyShaderCS::FParameters* parameters = GraphBuilder.AllocParameters<FAddMyShaderCS::FParameters>();
 	parameters->View = View.ViewUniformBuffer;
 	parameters->Input = GetScreenPassTextureViewportParameters(viewport);
-	// Test
-	parameters->InputTexture = Inputs.OutputTexture;
+	// ピクセルシェーダの結果を反映したテクスチャ
+	parameters->InputTexture = Inputs.InputTexture;
+	// PrePostProcessPass_RenderThreadが走る前のテクスチャ
 	// parameters->InputTexture = Inputs.Target;
 	// 出力は、(*Inputs.SceneTextures)->SceneColorTexture に対して行う
 	parameters->OutputTexture = GraphBuilder.CreateUAV(Inputs.Target);
 	// outputTexture(出力バッファ)に書き込むとおかしくなる
 	// parameters->OutputTexture = GraphBuilder.CreateUAV(outputTexture);
-
-	FCommonDomain PermutationVector{};
-	PermutationVector.Set<FValueType>(EValueType::Color);
 	
-	FComputeShaderUtils::AddPass(
-		GraphBuilder,
-		RDG_EVENT_NAME("AddMyCS"),
-		TShaderMapRef<FAddMyShaderCS>(shaderMap, PermutationVector),
-		parameters,
-		FComputeShaderUtils::GetGroupCount(viewport.Rect.Size(),
-			FIntPoint(16, 16))
-			);
-
-	/*
-	 * 結果が反映されない
-	 * 
+	// レンダーパスを追加
 	FComputeShaderUtils::AddPass(
 		GraphBuilder,
 		RDG_EVENT_NAME("AddMyCS"),
@@ -118,7 +93,6 @@ FRDGTextureRef AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, 
 		parameters,
 		FComputeShaderUtils::GetGroupCount(viewport.Rect.Size(),
 		FIntPoint(16, 16)));
-		*/
 	
 	return outputTexture;
 } 

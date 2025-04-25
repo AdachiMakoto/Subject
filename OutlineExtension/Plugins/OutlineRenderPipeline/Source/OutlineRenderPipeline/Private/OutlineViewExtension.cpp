@@ -111,11 +111,12 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		PassParameters->Bias = FinalOutlineSettings.Bias;
 		PassParameters->Intensity = FinalOutlineSettings.Intensity;
 		PassParameters->Color = FVector3f(FinalOutlineSettings.Color);
-		// PassParameters->RenderTargets[0] = FRenderTargetBinding(OutputTexture, ERenderTargetLoadAction::EClear);
-		// 書き込めた
-		PassParameters->RenderTargets[0] = FRenderTargetBinding(SceneColor.Texture, ERenderTargetLoadAction::ELoad);
-
+		// TODO : テスト用
 		PassParameters->TestColor = FVector4f(0.0, 1.0, 0.0, 1.0);
+		// OutputTexture に出力する
+		// PassParameters->RenderTargets[0] = FRenderTargetBinding(OutputTexture, ERenderTargetLoadAction::EClear);
+		// (*Inputs.SceneTextures)->SceneColorTexture に出力する
+		PassParameters->RenderTargets[0] = FRenderTargetBinding(SceneColor.Texture, ERenderTargetLoadAction::ELoad);
 
 		const FScreenPassTexture BlackDummy(GSystemTextures.GetBlackDummy(GraphBuilder));
 
@@ -134,24 +135,20 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 			TStaticDepthStencilState<false, CF_Always>::GetRHI(),
 			PassParameters);
 	}
-	
 
 
 	// Add Compute Shader
 	{
 		FAddMyShaderCSInput addMyInputCS;
 		addMyInputCS.Target = (*Inputs.SceneTextures)->SceneColorTexture;
-		addMyInputCS.OutputTexture = SceneColor.Texture;
-		// addMyInputCS.Target = SceneColor.Texture;
-		// addMyInputCS.InputTexture = (*Inputs.SceneTextures)->SceneColorTexture;
-		// addMyInputCS.OutputTexture = OutputTexture;
-		// addMyInputCS.InOutSceneColor = Inputs.Scene;
+		addMyInputCS.InputTexture = SceneColor.Texture;
 
 		auto& inView = static_cast<const FViewInfo&>(View);
 		FRDGTextureRef output =  AddComputePass(GraphBuilder, inView, addMyInputCS);
 		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. aaaaaaaaaaa #####"));
 	} 
 
+	
 	/*
 	// Add Pixel Shader
 	{
