@@ -37,7 +37,28 @@ namespace
 	IMPLEMENT_GLOBAL_SHADER(FAddMyShaderCS, "/Plugin/OutlineRenderPipeline/Private/AddMy.usf", "AddMyCS", SF_Compute);
 
 	
+	class FCopyShaderCS : public FGlobalShader
+	{
+	public:
+		DECLARE_GLOBAL_SHADER(FCopyShaderCS);
+		SHADER_USE_PARAMETER_STRUCT(FCopyShaderCS, FGlobalShader);
+		
+		BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
+			SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
+			SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, Input)
+			SHADER_PARAMETER_RDG_TEXTURE(Texture2D, CopyTexture)
+			SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D, OutputCopyTexture)
+		END_SHADER_PARAMETER_STRUCT()
 
+		static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Params)
+		{
+			return IsFeatureLevelSupported(Params.Platform, ERHIFeatureLevel::SM5) || IsFeatureLevelSupported(Params.Platform, ERHIFeatureLevel::SM6);
+		}
+	};
+
+	IMPLEMENT_GLOBAL_SHADER(FCopyShaderCS, "/Plugin/OutlineRenderPipeline/Private/AddMy.usf", "CopyCS", SF_Compute);
+
+	
 	class FAddMyShaderPS : public FGlobalShader
 	{
 	public:
@@ -95,6 +116,34 @@ FRDGTextureRef AddComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, 
 		FIntPoint(16, 16)));
 	
 	return outputTexture;
+} 
+
+
+void CopyComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FCopyShaderCSInput& Inputs)
+{
+	FIntPoint Resolution = View.ViewRect.Size();
+
+	FScreenPassTextureViewport viewport = FScreenPassTextureViewport(View.ViewRect);
+	FRDGTextureDesc desc = FRDGTextureDesc::Create2D(Inputs.Target->Desc.Extent, PF_A32B32G32R32F, FClearValueBinding::None, TexCreate_ShaderResource | TexCreate_UAV);
+	FRDGTextureRef outputTexture = GraphBuilder.CreateTexture(desc, TEXT("myCopyTexture"));
+
+	FGlobalShaderMap* shaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
+	TShaderMapRef<FCopyShaderCS> computeShader(shaderMap);
+
+	FCopyShaderCS::FParameters* parameters = GraphBuilder.AllocParameters<FCopyShaderCS::FParameters>();
+	parameters->View = View.ViewUniformBuffer;
+	parameters->Input = GetScreenPassTextureViewportParameters(viewport);
+	parameters->CopyTexture = Inputs.InputTexture;
+	parameters->OutputCopyTexture = GraphBuilder.CreateUAV(Inputs.Target);
+	
+	// レンダーパスを追加
+	FComputeShaderUtils::AddPass(
+		GraphBuilder,
+		RDG_EVENT_NAME("CopyCS"),
+		computeShader,
+		parameters,
+		FComputeShaderUtils::GetGroupCount(viewport.Rect.Size(),
+		FIntPoint(16, 16)));
 } 
 
 

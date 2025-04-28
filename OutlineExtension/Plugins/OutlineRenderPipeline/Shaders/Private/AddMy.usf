@@ -17,7 +17,7 @@
 // Compute shader
 //
 //----------------------------------------------------------------------
-
+// AddMyCS
 RWTexture2D<float4> OutputTexture;
 Texture2D<float4> InputTexture;
 
@@ -29,6 +29,18 @@ void AddMyCS(uint2 id : SV_DispatchThreadID)
 	// // t = float4(1.0f, 0.5f, 1.0f, 1.0f);
 	OutputTexture[id] = t;
 	// OutputTexture[id] = float4(0.0f, 1.0f, 0.0f, 1.0f);
+}
+
+
+// CopyCS
+RWTexture2D<float4> OutputCopyTexture;
+Texture2D<float4> CopyTexture;
+
+[numthreads(16,16,1)]
+void CopyCS(uint2 id : SV_DispatchThreadID)
+{
+	float4 t = CopyTexture[id];
+	OutputCopyTexture[id] = t;
 }
 
 

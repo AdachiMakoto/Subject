@@ -90,16 +90,31 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 	const FScreenPassTextureViewport InputViewport(SceneColor);
 	const FScreenPassTextureViewport OutputViewport(InputViewport);
 	
-	FRDGTextureRef OutputTexture;
+	
+	// FRDGTextureRef OutputTexture;
+	// {
+	// 	FRDGTextureDesc OutputTextureDesc = SceneColor.Texture->Desc;
+	// 	OutputTextureDesc.Reset();
+	// 	OutputTextureDesc.Flags |= TexCreate_RenderTargetable | TexCreate_ShaderResource;
+	// 	OutputTexture = GraphBuilder.CreateTexture(OutputTextureDesc, TEXT("Outline.Output"));
+	// }
+
+	//
+	// 初期のバッファを保存
+	//
+	FRDGTextureRef SetupTexture;
 	{
 		FRDGTextureDesc OutputTextureDesc = SceneColor.Texture->Desc;
 		OutputTextureDesc.Reset();
 		OutputTextureDesc.Flags |= TexCreate_RenderTargetable | TexCreate_ShaderResource;
-		OutputTexture = GraphBuilder.CreateTexture(OutputTextureDesc, TEXT("Outline.Output"));
+		SetupTexture = GraphBuilder.CreateTexture(OutputTextureDesc, TEXT("SetupTexture"));
+		AddCopyTexturePass(GraphBuilder, SceneColor.Texture, SetupTexture);
 	}
 
 	
+	//
 	// Outline Pass
+	//
 	{
 		TShaderMapRef<FScreenVS> VertexShader(static_cast<const FViewInfo&>(View).ShaderMap);
 		TShaderMapRef<FOutlinePS> PixelShader(static_cast<const FViewInfo&>(View).ShaderMap);
@@ -113,9 +128,7 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		PassParameters->Color = FVector3f(FinalOutlineSettings.Color);
 		// TODO : テスト用
 		PassParameters->TestColor = FVector4f(0.0, 1.0, 0.0, 1.0);
-		// OutputTexture に出力する
-		// PassParameters->RenderTargets[0] = FRenderTargetBinding(OutputTexture, ERenderTargetLoadAction::EClear);
-		// (*Inputs.SceneTextures)->SceneColorTexture に出力する
+		// TODO : 動くコード
 		PassParameters->RenderTargets[0] = FRenderTargetBinding(SceneColor.Texture, ERenderTargetLoadAction::ELoad);
 
 		const FScreenPassTexture BlackDummy(GSystemTextures.GetBlackDummy(GraphBuilder));
@@ -135,17 +148,20 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 			TStaticDepthStencilState<false, CF_Always>::GetRHI(),
 			PassParameters);
 	}
+	
 
-
+	//
 	// Add Compute Shader
+	//
+	FRDGTextureRef OutputMyCSTexture;
 	{
 		FAddMyShaderCSInput addMyInputCS;
+		// TODO : 動くコード
 		addMyInputCS.Target = (*Inputs.SceneTextures)->SceneColorTexture;
 		addMyInputCS.InputTexture = SceneColor.Texture;
 
 		auto& inView = static_cast<const FViewInfo&>(View);
-		FRDGTextureRef output =  AddComputePass(GraphBuilder, inView, addMyInputCS);
-		// UE_LOG(LogTemp, Warning, TEXT("##### This route is now currency. aaaaaaaaaaa #####"));
+		OutputMyCSTexture =  AddComputePass(GraphBuilder, inView, addMyInputCS);
 	} 
 
 	
@@ -153,7 +169,7 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 	// Add Pixel Shader
 	{
 		FAddMyShaderPSInput addMyInputsPS;
-		// addMyInputs.Target = (*Inputs.SceneTextures)->SceneColorTexture;
+		addMyInputsPS.Target = (*Inputs.SceneTextures)->SceneColorTexture;
 		addMyInputsPS.SceneTextures = Inputs.SceneTextures;
 		addMyInputsPS.OutputTexture = OutputTexture;
 		
@@ -164,12 +180,27 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 	}
 	*/
 	
+
+	//
+	// バッファをリセットする
+	//
+	FRDGTextureRef copyTexture = nullptr;
+	{
+		FCopyShaderCSInput copyInputCS;
+		copyInputCS.Target = (*Inputs.SceneTextures)->SceneColorTexture;
+		copyInputCS.InputTexture = SetupTexture;
+
+		auto& inView = static_cast<const FViewInfo&>(View);
+		CopyComputePass(GraphBuilder, inView, copyInputCS);
+	}
+
 	
 	// Copy Pass
-	{
+	// {
 		// NOTE : ここを実行すると画面がおかしくなる。『utputTexture』もしくは『SceneColor.Texture』が正しくデータが入っていない
 		// NOTE : コンピュートシェーダで使用すると、画面が壊れる
 		// AddCopyTexturePass(GraphBuilder, OutputTexture, SceneColor.Texture);
-	}
+		// AddCopyTexturePass(GraphBuilder, OutputMyCSTexture, SceneColor.Texture);
+	// }
 
 }
