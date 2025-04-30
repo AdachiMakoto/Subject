@@ -21,10 +21,15 @@ public:
 	virtual void SetupView(FSceneViewFamily& InViewFamily, FSceneView& InView) override {}
 	virtual void BeginRenderViewFamily(FSceneViewFamily& InViewFamily) override {}
 
-	/**
-	 * Called right before Post Processing rendering begins
-	 */
+	//
+	// ポストプロセスの処理前に実行される
+	//
 	virtual void PrePostProcessPass_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessingInputs& Inputs) override;
+	
+	//
+	//　任氏のポストプロセスの処理のタイミングで実行可能
+	//
+	virtual void SubscribeToPostProcessingPass(EPostProcessingPass Pass, FAfterPassCallbackDelegateArray& InOutPassCallbacks, bool bIsPassEnabled) override;
 
 public:
 	/**  */
@@ -39,4 +44,9 @@ private:
 	 * Setup by the main thread, passed to the render thread and never touched again by the main thread.
 	 */
 	FOutlineSettings FinalOutlineSettings;
+
+	//
+	// SubscribeToPostProcessingPassで呼び出す関数のサンプル
+	//
+	FScreenPassTexture CallTestPass(FRDGBuilder& GraphBuilder, const FSceneView& InView, const FPostProcessMaterialInputs& Inputs);
 };

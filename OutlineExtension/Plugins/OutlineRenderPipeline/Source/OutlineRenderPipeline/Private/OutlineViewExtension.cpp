@@ -204,3 +204,23 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 	// }
 
 }
+
+
+void FOutlineViewExtension::SubscribeToPostProcessingPass(EPostProcessingPass Pass, FAfterPassCallbackDelegateArray& InOutPassCallbacks, bool bIsPassEnabled)
+{
+	if (Pass == EPostProcessingPass::Tonemap)
+	{
+		// example : CallTestPassを呼び出す場合
+		InOutPassCallbacks.Add(FAfterPassCallbackDelegate::CreateRaw(this, &FOutlineViewExtension::CallTestPass));
+	}
+}
+
+const int32 GDownsampleFactor = 4;
+
+FScreenPassTexture FOutlineViewExtension::CallTestPass(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessMaterialInputs& Inputs)
+{
+	// NOTE : ログが出力されている事を確認した
+	// UE_LOG(LogTemp, Warning, TEXT("**** Call FOutlineViewExtension::CallTestPass. ****"));
+	// TODO : 何もしない呼び出し？
+	return Inputs.GetInput(EPostProcessMaterialInput::SceneColor);
+}
