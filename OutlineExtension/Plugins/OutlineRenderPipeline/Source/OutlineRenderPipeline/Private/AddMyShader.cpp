@@ -12,9 +12,15 @@
 //  GPU パフォーマンスの統計を記録・表示するためのマクロ
 DECLARE_GPU_STAT(AddMyCS);
 DECLARE_GPU_STAT(AddMyPS);
+DECLARE_GPU_STAT(PostAddMyPS);
 
 namespace
 {
+	///////////////////////////////////////////////////////////////
+	//
+	// PrePostProcessPass_RenderThreadで呼び出し
+	//
+	///////////////////////////////////////////////////////////////
 	class FAddMyShaderCS : public FGlobalShader
 	{
 	public:
@@ -80,6 +86,59 @@ namespace
 		return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5) || IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM6);
 	}
 	IMPLEMENT_GLOBAL_SHADER(FAddMyShaderPS, "/Plugin/OutlineRenderPipeline/Private/AddMy.usf", "AddMyPS", SF_Pixel);
+
+
+	///////////////////////////////////////////////////////////////
+	//
+	// PostRenderBasePassDeferred_RenderThreadで呼び出し
+	//
+	///////////////////////////////////////////////////////////////
+	class FPostAddMyShaderCS : public FGlobalShader
+	{
+	public:
+		DECLARE_GLOBAL_SHADER(FPostAddMyShaderCS);
+		SHADER_USE_PARAMETER_STRUCT(FPostAddMyShaderCS, FGlobalShader);
+		
+		BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
+			SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
+			SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, Input)
+			SHADER_PARAMETER_RDG_TEXTURE(Texture2D, InputPostTexture)
+			SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D, OutputPostTexture)
+		END_SHADER_PARAMETER_STRUCT()
+
+		static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Params)
+		{
+			return IsFeatureLevelSupported(Params.Platform, ERHIFeatureLevel::SM5) || IsFeatureLevelSupported(Params.Platform, ERHIFeatureLevel::SM6);
+		}
+	};
+
+	IMPLEMENT_GLOBAL_SHADER(FPostAddMyShaderCS, "/Plugin/OutlineRenderPipeline/Private/AddMy.usf", "PostAddMyCS", SF_Compute);
+
+	class FPostAddMyShaderPS : public FGlobalShader
+	{
+	public:
+		DECLARE_GLOBAL_SHADER(FPostAddMyShaderPS);
+		SHADER_USE_PARAMETER_STRUCT(FPostAddMyShaderPS, FGlobalShader);
+
+		BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
+			// SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
+			SHADER_PARAMETER_STRUCT_INCLUDE(FSceneTextureShaderParameters, SceneTextures)
+			SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, Input)
+			SHADER_PARAMETER_RDG_TEXTURE(Texture2D, InputPostSceneColor)
+			SHADER_PARAMETER_SAMPLER(SamplerState, InputPostSceneColorSampler)
+			RENDER_TARGET_BINDING_SLOTS()
+		END_SHADER_PARAMETER_STRUCT()
+
+		static inline void ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& Environment)
+		{
+			FGlobalShader::ModifyCompilationEnvironment(Parameters, Environment);
+
+			Environment.SetDefine(TEXT("USE_CACHE"), 0);
+		}
+	};
+	
+	IMPLEMENT_GLOBAL_SHADER(FPostAddMyShaderPS, "/Plugin/OutlineRenderPipeline/Private/AddMy.usf", "PostAddMyPS", SF_Pixel);
+
 }
 
 
@@ -147,6 +206,38 @@ void CopyComputePass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FCo
 } 
 
 
+void PostAddMyCS(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FPostAddMyShaderCSInput& Inputs)
+{
+	// TODO : 通っている
+	// UE_LOG(LogTemp, Warning, TEXT("!!!! Call PostAddMyCS. !!!!"));
+	FIntPoint Resolution = View.ViewRect.Size();
+
+	FScreenPassTextureViewport viewport = FScreenPassTextureViewport(View.ViewRect);
+	FRDGTextureDesc desc = FRDGTextureDesc::Create2D(Inputs.Target->Desc.Extent, PF_A32B32G32R32F, FClearValueBinding::None, TexCreate_ShaderResource | TexCreate_UAV);
+	FRDGTextureRef outputTexture = GraphBuilder.CreateTexture(desc, TEXT("myPostTexture"));
+
+	FGlobalShaderMap* shaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
+	TShaderMapRef<FPostAddMyShaderCS> computeShader(shaderMap);
+
+	FPostAddMyShaderCS::FParameters* parameters = GraphBuilder.AllocParameters<FPostAddMyShaderCS::FParameters>();
+	parameters->View = View.ViewUniformBuffer;
+	parameters->Input = GetScreenPassTextureViewportParameters(viewport);
+	// ピクセルシェーダの結果を反映したテクスチャ
+	parameters->InputPostTexture = Inputs.InputTexture;
+	// 出力は、(*Inputs.SceneTextures)->SceneColorTexture に対して行う
+	parameters->OutputPostTexture = GraphBuilder.CreateUAV(Inputs.Target);
+	
+	// レンダーパスを追加
+	FComputeShaderUtils::AddPass(
+		GraphBuilder,
+		RDG_EVENT_NAME("PostAddMyCS"),
+		computeShader,
+		parameters,
+		FComputeShaderUtils::GetGroupCount(viewport.Rect.Size(),
+		FIntPoint(16, 16)));
+} 
+
+
 void AddPixelPass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMyShaderPSInput& Inputs)
 {
 	RDG_EVENT_SCOPE(GraphBuilder, "PostProcessAddMyPS");
@@ -182,6 +273,44 @@ void AddPixelPass(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FAddMy
 		AddDrawScreenPass(
 			GraphBuilder,
 			RDG_EVENT_NAME("AddMyPS"),
+			View,
+			OutputViewport,
+			InputViewport,
+			PixelShader,
+			Parameters);
+	}
+}
+
+void PostAddMyPS(FRDGBuilder& GraphBuilder, const FViewInfo& View, const FPostAddMyShaderPSInput& Inputs)
+{
+	RDG_EVENT_SCOPE(GraphBuilder, "PostProcessPostAddMyPS");
+	RDG_GPU_STAT_SCOPE(GraphBuilder, PostAddMyPS);
+	
+	FGlobalShaderMap* shaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
+	FScreenPassTextureViewport Viewport(View.ViewRect);
+
+	{
+		// 結果が反映されない
+		const FIntRect PrimaryViewRect = static_cast<const FViewInfo&>(View).ViewRect;
+		FScreenPassTexture SceneColor(Inputs.Target, PrimaryViewRect);
+		// FScreenPassTexture SceneColor((*Inputs.SceneTextures)->SceneColorTexture, PrimaryViewRect);
+		const FScreenPassTextureViewport InputViewport(SceneColor);
+		const FScreenPassTextureViewport OutputViewport(InputViewport);
+		TShaderMapRef<FPostAddMyShaderPS> PixelShader(static_cast<const FViewInfo&>(View).ShaderMap);
+
+		FPostAddMyShaderPS::FParameters* Parameters = GraphBuilder.AllocParameters<FPostAddMyShaderPS::FParameters>();
+		// Parameters->View = View.ViewUniformBuffer;
+		Parameters->Input = GetScreenPassTextureViewportParameters(Viewport);
+		// Parameters->SceneTextures = GetSceneTextureShaderParameters(Inputs.SceneTextures);
+		Parameters->InputPostSceneColor = Inputs.InputTexture;
+		Parameters->InputPostSceneColorSampler = TStaticSamplerState<SF_Point>::GetRHI();
+		//Parameters->SceneTextures = GetSceneTextureShaderParameters(Inputs.OutputTexture);
+		// SV_Target0(出力)
+		Parameters->RenderTargets[0] = FRenderTargetBinding(Inputs.Target, ERenderTargetLoadAction::ELoad);
+
+		AddDrawScreenPass(
+			GraphBuilder,
+			RDG_EVENT_NAME("PostAddMyPS"),
 			View,
 			OutputViewport,
 			InputViewport,

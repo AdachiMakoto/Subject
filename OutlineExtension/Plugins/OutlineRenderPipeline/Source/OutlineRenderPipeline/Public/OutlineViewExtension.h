@@ -25,7 +25,12 @@ public:
 	// ポストプロセスの処理前に実行される
 	//
 	virtual void PrePostProcessPass_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessingInputs& Inputs) override;
-	
+
+	//
+	// ポストプロセスの処理後に実行される
+	//
+	virtual void PostRenderBasePassDeferred_RenderThread(FRDGBuilder& GraphBuilder, FSceneView& View, const FRenderTargetBindingSlots& RenderTargets, TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures) override;
+
 	//
 	//　任氏のポストプロセスの処理のタイミングで実行可能
 	//

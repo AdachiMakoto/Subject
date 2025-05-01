@@ -31,7 +31,6 @@ void AddMyCS(uint2 id : SV_DispatchThreadID)
 	// OutputTexture[id] = float4(0.0f, 1.0f, 0.0f, 1.0f);
 }
 
-
 // CopyCS
 RWTexture2D<float4> OutputCopyTexture;
 Texture2D<float4> CopyTexture;
@@ -41,6 +40,19 @@ void CopyCS(uint2 id : SV_DispatchThreadID)
 {
 	float4 t = CopyTexture[id];
 	OutputCopyTexture[id] = t;
+}
+
+// PostRenderBasePassDeferred_RenderThreadでの実験用(※動かない)
+// PostAddMyCS
+Texture2D<float4> InputPostTexture;
+RWTexture2D<float4> OutputPostTexture;
+
+[numthreads(16,16,1)]
+void PostAddMyCS(uint2 id : SV_DispatchThreadID)
+{
+	float4 t = InputPostTexture[id];
+	t *= float4(0.5f, 1.0f, 1.0f, 1.0f);
+	OutputPostTexture[id] = t;
 }
 
 
@@ -82,4 +94,19 @@ void AddMyPS(FScreenVertexOutput Input, out float4 OutColor : SV_Target0)
 
     // 動く
     // OutColor = float4(1.f, 0.f, 0.f, 0.5f);
+}
+
+// PostRenderBasePassDeferred_RenderThreadでの実験用
+Texture2D<float4> InputPostSceneColor;
+SamplerState InputPostSceneColorSampler;
+
+void PostAddMyPS(FScreenVertexOutput Input, out float4 OutColor : SV_Target0)
+{
+	float4 sceneColor = Texture2DSample(InputPostSceneColor, InputPostSceneColorSampler, Input.UV);
+	// sceneColor *= float4(0.5f, 0.0f, 0.0f, 1.0f);
+	sceneColor.r = 1.0f;
+	sceneColor.g *= 0.5f;
+	sceneColor.b *= 0.5f;
+	OutColor = float4(sceneColor.r, sceneColor.g, sceneColor.b, 1.0f);
+	// OutColor = float4(1.f, 0.f, 0.f, 0.5f);
 }

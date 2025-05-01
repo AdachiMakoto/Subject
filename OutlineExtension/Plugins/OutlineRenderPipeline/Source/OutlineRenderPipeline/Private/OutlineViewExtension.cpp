@@ -111,7 +111,7 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		AddCopyTexturePass(GraphBuilder, SceneColor.Texture, SetupTexture);
 	}
 
-	
+/*	
 	//
 	// Outline Pass
 	//
@@ -148,8 +148,8 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 			TStaticDepthStencilState<false, CF_Always>::GetRHI(),
 			PassParameters);
 	}
-	
-
+*/	
+/*
 	//
 	// Add Compute Shader
 	//
@@ -163,7 +163,7 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		auto& inView = static_cast<const FViewInfo&>(View);
 		OutputMyCSTexture =  AddComputePass(GraphBuilder, inView, addMyInputCS);
 	} 
-
+*/
 	
 	/*
 	// Add Pixel Shader
@@ -180,7 +180,7 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 	}
 	*/
 	
-
+/*
 	//
 	// バッファをリセットする
 	//
@@ -193,7 +193,7 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		auto& inView = static_cast<const FViewInfo&>(View);
 		CopyComputePass(GraphBuilder, inView, copyInputCS);
 	}
-
+*/
 	
 	// Copy Pass
 	// {
@@ -205,7 +205,31 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 
 }
 
+//
+// PostRenderBasePassDeferred_RenderThread
+//
+void FOutlineViewExtension::PostRenderBasePassDeferred_RenderThread(FRDGBuilder& GraphBuilder, FSceneView& View, const FRenderTargetBindingSlots& RenderTargets, TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures)
+{
+	auto& inView = static_cast<const FViewInfo&>(View);
+	
+	// NOTE : 上手く動かない
+	// FPostAddMyShaderCSInput postAddMyInputCS;
+	// postAddMyInputCS.Target = RenderTargets[0].GetTexture();
+	// postAddMyInputCS.InputTexture = SceneTextures->GetParameters()->SceneColorTexture;
+	// 
+	// PostAddMyCS(GraphBuilder, inView, postAddMyInputCS);
 
+	FPostAddMyShaderPSInput postAddMyInputPS;
+	postAddMyInputPS.Target = RenderTargets[0].GetTexture();
+	postAddMyInputPS.InputTexture = SceneTextures->GetParameters()->SceneColorTexture;
+	postAddMyInputPS.SceneTextures = SceneTextures;
+	PostAddMyPS(GraphBuilder, inView, postAddMyInputPS);
+}
+
+
+//
+// SubscribeToPostProcessingPass
+//
 void FOutlineViewExtension::SubscribeToPostProcessingPass(EPostProcessingPass Pass, FAfterPassCallbackDelegateArray& InOutPassCallbacks, bool bIsPassEnabled)
 {
 	if (Pass == EPostProcessingPass::Tonemap)
