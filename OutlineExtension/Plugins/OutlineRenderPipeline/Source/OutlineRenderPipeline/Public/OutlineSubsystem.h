@@ -41,6 +41,12 @@ public:
 	/**  */
 	const FOutlineSettings GetOutlineSettingsForLock() const;
 
+	/** AnosptropicKuwaharaFilter */
+	bool EnableAnisoKuwahara = false;
+	float AnisoKuwahara_AnisoControl = 1.0f;
+	float AnisoKuwahara_Hardness = 8.0f;
+	float AnisoKuwahara_Sharpness = 8.0f;
+	
 private:
 	/**  */
 	mutable FCriticalSection CriticalSection;

@@ -34,4 +34,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Outline Settings")
 	FOutlineSettings OutlineSettings;
 
+	//
+	// Anisotropic Kuwahara Filter
+	//
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="AnisoKuwahara")
+	bool enable_aniso_kuwahara = false;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="AnisoKuwahara")
+	float aniso_kuwahara_aniso_control = 1.0f;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="AnisoKuwahara")
+	float aniso_kuwahara_hardness = 8.0f;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="AnisoKuwahara")
+	float aniso_kuwahara_sharpness = 8.0f;
 };

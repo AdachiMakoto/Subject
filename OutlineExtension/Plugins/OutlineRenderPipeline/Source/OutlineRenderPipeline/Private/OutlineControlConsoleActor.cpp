@@ -36,6 +36,11 @@ void AOutlineControlConsoleActor::OnConstruction(const FTransform& Transform)
 	if (UOutlineSubsystem* Subsystem = UOutlineSubsystem::GetCurrent(GetWorld()))
 	{
 		Subsystem->OverrideOutlineSettings(OutlineSettings);
+
+		Subsystem->EnableAnisoKuwahara = enable_aniso_kuwahara;
+		Subsystem->AnisoKuwahara_AnisoControl = aniso_kuwahara_aniso_control;
+		Subsystem->AnisoKuwahara_Hardness = aniso_kuwahara_hardness;
+		Subsystem->AnisoKuwahara_Sharpness = aniso_kuwahara_sharpness;
 	}
 }
 #endif

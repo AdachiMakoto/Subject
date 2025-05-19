@@ -10,6 +10,7 @@
 #include "DataDrivenShaderPlatformInfo.h"
 #include "OutlineSubsystem.h"
 #include "AddMyShader.h"
+#include "AnisotropicKuwahara.h"
 
 
 DECLARE_GPU_STAT(Outline);
@@ -194,6 +195,21 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		CopyComputePass(GraphBuilder, inView, copyInputCS);
 	}
 */
+	//
+	// 異方性桑原フィルタ
+	//
+	if (OutlineSubsystem->EnableAnisoKuwahara)
+	{
+		FAnisotropicKuwaharaCSInput akInputCS;
+		akInputCS.SceneTextures = Inputs.SceneTextures;
+		akInputCS.AKTarget = (*Inputs.SceneTextures)->SceneColorTexture;
+		akInputCS.aniso_kuwahara_aniso_control = OutlineSubsystem->AnisoKuwahara_AnisoControl;
+		akInputCS.aniso_kuwahara_hardness = OutlineSubsystem->AnisoKuwahara_Hardness;
+		akInputCS.aniso_kuwahara_sharpness = OutlineSubsystem->AnisoKuwahara_Sharpness;
+		akInputCS.AKInputTexture = SetupTexture;
+		AnisotropicKuwaharaPass(GraphBuilder, View, akInputCS);
+	}
+
 	
 	// Copy Pass
 	// {
@@ -210,20 +226,16 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 //
 void FOutlineViewExtension::PostRenderBasePassDeferred_RenderThread(FRDGBuilder& GraphBuilder, FSceneView& View, const FRenderTargetBindingSlots& RenderTargets, TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures)
 {
+/*
 	auto& inView = static_cast<const FViewInfo&>(View);
 	
-	// NOTE : 上手く動かない
-	// FPostAddMyShaderCSInput postAddMyInputCS;
-	// postAddMyInputCS.Target = RenderTargets[0].GetTexture();
-	// postAddMyInputCS.InputTexture = SceneTextures->GetParameters()->SceneColorTexture;
-	// 
-	// PostAddMyCS(GraphBuilder, inView, postAddMyInputCS);
-
+	// NOTE : ひとます動く
 	FPostAddMyShaderPSInput postAddMyInputPS;
 	postAddMyInputPS.Target = RenderTargets[0].GetTexture();
 	postAddMyInputPS.InputTexture = SceneTextures->GetParameters()->SceneColorTexture;
 	postAddMyInputPS.SceneTextures = SceneTextures;
 	PostAddMyPS(GraphBuilder, inView, postAddMyInputPS);
+*/
 }
 
 
