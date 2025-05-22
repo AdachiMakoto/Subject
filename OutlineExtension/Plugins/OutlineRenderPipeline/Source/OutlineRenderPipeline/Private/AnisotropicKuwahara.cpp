@@ -33,11 +33,7 @@ public:
 		
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, eigenvectorpass_SourceTexture)
-		SHADER_PARAMETER(FUintVector2, eigenvectorpass_SourceDimensions)
-		SHADER_PARAMETER_SAMPLER(SamplerState, eigenvectorpass_SourceSampler)
-	
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, eigenvectorpass_OutputTexture)
-		SHADER_PARAMETER(FUintVector2, eigenvectorpass_OutputDimensions)
 	END_SHADER_PARAMETER_STRUCT()
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
@@ -71,9 +67,6 @@ public:
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, blurpass_SourceTexture)
-		SHADER_PARAMETER(FUintVector2, blurpass_SourceDimensions)
-		SHADER_PARAMETER_SAMPLER(SamplerState, blurpass_SourceSampler)
-
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, blurpass_OutputTexture)
 		SHADER_PARAMETER(FUintVector2, blurpass_OutputDimensions)
 	END_SHADER_PARAMETER_STRUCT()
@@ -110,11 +103,7 @@ public:
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, calcanisopass_SourceTexture)
-		SHADER_PARAMETER(FUintVector2, calcanisopass_SourceDimensions)
-		SHADER_PARAMETER_SAMPLER(SamplerState, calcanisopass_SourceSampler)
-
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, calcanisopass_OutputTexture)
-		SHADER_PARAMETER(FUintVector2, calcanisopass_OutputDimensions)
 	END_SHADER_PARAMETER_STRUCT()
 
 	//Called by the engine to determine which permutations to compile for this shader
@@ -149,13 +138,9 @@ public:
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, finalpass_SourceTexture)
-		SHADER_PARAMETER(FUintVector2, finalpass_SourceDimensions)
 		SHADER_PARAMETER_SAMPLER(SamplerState, finalpass_SourceSampler)
-
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, finalpass_SceneTexture)
-
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, finalpass_OutputTexture)
-		SHADER_PARAMETER(FUintVector2, finalpass_OutputDimensions)
 
 		SHADER_PARAMETER(float, finalpass_aniso_control)	// 1
 		SHADER_PARAMETER(float, finalpass_hardness)			// 8
@@ -199,8 +184,7 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 
 	
 	FRDGTextureRef tex_eigenvector = GraphBuilder.CreateTexture(
-		FRDGTextureDesc::Create2D(
-			FIntPoint(PrimaryViewRect.Width(), PrimaryViewRect.Height()),
+		FRDGTextureDesc::Create2D(FIntPoint(PrimaryViewRect.Width(), PrimaryViewRect.Height()),
 			EPixelFormat::PF_FloatRGBA,
 			{},
 			ETextureCreateFlags::ShaderResource | ETextureCreateFlags::RenderTargetable | ETextureCreateFlags::UAV
@@ -228,11 +212,7 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		FAnisotropicKuwaharaEigenvectorCS::FParameters* Parameters = GraphBuilder.AllocParameters<FAnisotropicKuwaharaEigenvectorCS::FParameters>();
 		{
 			Parameters->eigenvectorpass_SourceTexture = Inputs.SceneTextures->GetParameters()->SceneColorTexture;
-			Parameters->eigenvectorpass_SourceDimensions = WorkRect;
-			Parameters->eigenvectorpass_SourceSampler = PointClampSampler;
-
 			Parameters->eigenvectorpass_OutputTexture = WorkUav;
-			Parameters->eigenvectorpass_OutputDimensions = WorkRect;
 		}
 	
 		TShaderMapRef<FAnisotropicKuwaharaEigenvectorCS> cs(GetGlobalShaderMap(GMaxRHIFeatureLevel));
@@ -248,10 +228,8 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(tex_eigenvector_blurwork);
 		FAnisoKuwaharaBlurCS::FParameters* Parameters = GraphBuilder.AllocParameters<FAnisoKuwaharaBlurCS::FParameters>();
 		{
+			// tex_eigenvectorは、固有ベクトルの結果を持つ
 			Parameters->blurpass_SourceTexture = tex_eigenvector;
-			Parameters->blurpass_SourceDimensions = WorkRect;
-			Parameters->blurpass_SourceSampler = PointClampSampler;
-
 			Parameters->blurpass_OutputTexture = WorkUav;
 			Parameters->blurpass_OutputDimensions = WorkRect;
 		}
@@ -269,11 +247,7 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		FAnisoKuwaharaCalcAnisoCS::FParameters* Parameters = GraphBuilder.AllocParameters<FAnisoKuwaharaCalcAnisoCS::FParameters>();
 		{
 			Parameters->calcanisopass_SourceTexture = tex_eigenvector_blurwork;
-			Parameters->calcanisopass_SourceDimensions = WorkRect;
-			Parameters->calcanisopass_SourceSampler = PointClampSampler;
-
 			Parameters->calcanisopass_OutputTexture = WorkUav;
-			Parameters->calcanisopass_OutputDimensions = WorkRect;
 		}
 	
 		TShaderMapRef<FAnisoKuwaharaCalcAnisoCS> cs(GetGlobalShaderMap(GMaxRHIFeatureLevel));
@@ -310,13 +284,9 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		FAnisoKuwaharaFinalCS::FParameters* Parameters = GraphBuilder.AllocParameters<FAnisoKuwaharaFinalCS::FParameters>();
 		{
 			Parameters->finalpass_SourceTexture = tex_aniso;
-			Parameters->finalpass_SourceDimensions = WorkRect;
 			Parameters->finalpass_SourceSampler = PointClampSampler;
-
 			Parameters->finalpass_SceneTexture = tex_scene_color_copy;
-
 			Parameters->finalpass_OutputTexture = WorkUav;
-			Parameters->finalpass_OutputDimensions = WorkRect;
 
 			Parameters->finalpass_aniso_control = Inputs.aniso_kuwahara_aniso_control;
 			Parameters->finalpass_hardness = Inputs.aniso_kuwahara_hardness;
@@ -330,34 +300,4 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 	
 		FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("AnisoKuwaharaEigen"), ERDGPassFlags::Compute, cs, Parameters, DispatchGroupSize);
 	}
-
-	
-	/*
-	 * ただコピーするだけ
-	 * 
-	auto& inView = static_cast<const FViewInfo&>(View);
-	FIntPoint Resolution = inView.ViewRect.Size();
-
-	FScreenPassTextureViewport viewport = FScreenPassTextureViewport(inView.ViewRect);
-	FRDGTextureDesc desc = FRDGTextureDesc::Create2D(Inputs.AKTarget->Desc.Extent, PF_A32B32G32R32F, FClearValueBinding::None, TexCreate_ShaderResource | TexCreate_UAV);
-	FRDGTextureRef outputTexture = GraphBuilder.CreateTexture(desc, TEXT("AKEigenvectorCSTexture"));
-
-	FGlobalShaderMap* shaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
-	TShaderMapRef<FAnisotropicKuwaharaEigenvectorCS> computeShader(shaderMap);
-
-	FAnisotropicKuwaharaEigenvectorCS::FParameters* parameters = GraphBuilder.AllocParameters<FAnisotropicKuwaharaEigenvectorCS::FParameters>();
-	// parameters->View = View.ViewUniformBuffer;
-	// parameters->Input = GetScreenPassTextureViewportParameters(viewport);
-	parameters->eigenvectorpass_SourceTexture = Inputs.AKInputTexture;
-	parameters->eigenvectorpass_OutputTexture = GraphBuilder.CreateUAV(Inputs.AKTarget);
-	
-	// レンダーパスを追加
-	FComputeShaderUtils::AddPass(
-		GraphBuilder,
-		RDG_EVENT_NAME("AnisoKuwaharaEigenvectorCS"),
-		computeShader,
-		parameters,
-		FComputeShaderUtils::GetGroupCount(viewport.Rect.Size(),
-		FIntPoint(16, 16)));
-	*/
 }

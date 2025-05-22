@@ -1,0 +1,82 @@
+// KuwaharaFilterCS.hlsl
+
+cbuffer FilterParams : register(b0)
+{
+    float2 ImageSize;
+    float2 EllipseA;     // 長軸 (a), 短軸 (b)
+    float Angle;         // 楕円の回転角
+    int NumSectors;      // セクター数（例: 8）
+    float Radius;        // フィルタ半径
+    float Q;             // シャープネスパラメータ（例: 8）
+};
+
+Texture2D InputTex : register(t0);
+RWTexture2D<float4> OutputTex : register(u0);
+
+#define PI 3.14159265
+
+// 回転行列を使って楕円空間に変換
+float2 Rotate(float2 v, float angle)
+{
+    float s = sin(angle);
+    float c = cos(angle);
+    return float2(c * v.x - s * v.y, s * v.x + c * v.y);
+}
+
+// ガウス関数
+float Gaussian(float2 x, float sigma)
+{
+    float r2 = dot(x, x);
+    return exp(-r2 / (2.0 * sigma * sigma));
+}
+
+// 重み関数（セクター分割＋ガウス減衰）
+float SectorWeight(float2 dir, float angle, float sectorWidth, float q)
+{
+    float theta = atan2(dir.y, dir.x);
+    float delta = abs(angle - theta);
+    delta = min(delta, 2 * PI - delta);
+    float w = pow(cos(delta * NumSectors / 2), q); // シャープネス制御
+    return max(w, 0.0);
+}
+
+[numthreads(8, 8, 1)]
+void main(uint3 DTid : SV_DispatchThreadID)
+{
+    float2 uv = (DTid.xy + 0.5) / ImageSize;
+    float2 center = uv * ImageSize;
+
+    float4 accumColor = float4(0, 0, 0, 0);
+    float accumWeight = 0.0;
+
+    for (int dy = -Radius; dy <= Radius; dy++)
+    {
+        for (int dx = -Radius; dx <= Radius; dx++)
+        {
+            float2 offset = float2(dx, dy);
+            float2 sampleUV = (center + offset) / ImageSize;
+
+            float2 rotated = Rotate(offset, -Angle);
+            rotated.x /= EllipseA.x;
+            rotated.y /= EllipseA.y;
+
+            if (dot(rotated, rotated) <= 1.0)
+            {
+                float sectorAngle = atan2(offset.y, offset.x);
+                float weight = 0.0;
+
+                for (int i = 0; i < NumSectors; i++)
+                {
+                    float angle = (2 * PI / NumSectors) * i;
+                    weight += SectorWeight(offset, angle, 2 * PI / NumSectors, Q);
+                }
+
+                float4 color = InputTex.SampleLevel(samplerLinearClamp, sampleUV, 0);
+                accumColor += color * weight;
+                accumWeight += weight;
+            }
+        }
+    }
+
+    OutputTex[DTid.xy] = accumColor / max(accumWeight, 1e-5);
+}
