@@ -46,6 +46,14 @@ public:
 	float AnisoKuwahara_AnisoControl = 1.0f;
 	float AnisoKuwahara_Hardness = 8.0f;
 	float AnisoKuwahara_Sharpness = 8.0f;
+
+	/** AnosptropicKuwaharaFilter */
+	int UnityAnisoKuwaharaGaussRadius = 5;
+	float UnityAnisoKuwaharaGaussSigma = 8.0f;
+	float UnityAnisoKuwaharaAlpha = 1.0f;
+	int UnityAnisoKuwaharaRadius = 2;
+	int UnityAnisoKuwaharaQ = 8;
+	float UnityAnisoKuwaharaResolutionScale = 1.0f;
 	
 private:
 	/**  */

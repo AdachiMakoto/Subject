@@ -69,6 +69,8 @@ public:
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, blurpass_SourceTexture)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, blurpass_OutputTexture)
 		SHADER_PARAMETER(FUintVector2, blurpass_OutputDimensions)
+		SHADER_PARAMETER(int32, GaussRadius)
+		SHADER_PARAMETER(float, GaussSigma)
 	END_SHADER_PARAMETER_STRUCT()
 
 	//Called by the engine to determine which permutations to compile for this shader
@@ -146,6 +148,9 @@ public:
 		SHADER_PARAMETER(float, finalpass_hardness)			// 8
 		SHADER_PARAMETER(float, finalpass_sharpness)		// 8
 
+		SHADER_PARAMETER(int32, KuwaharaRadius)
+		SHADER_PARAMETER(int32, KuwaharaQ)
+		SHADER_PARAMETER(float, KuwaharaAlpha)
 	END_SHADER_PARAMETER_STRUCT()
 
 	//Called by the engine to determine which permutations to compile for this shader
@@ -232,6 +237,10 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 			Parameters->blurpass_SourceTexture = tex_eigenvector;
 			Parameters->blurpass_OutputTexture = WorkUav;
 			Parameters->blurpass_OutputDimensions = WorkRect;
+			Parameters->GaussRadius = Inputs.AnisoKuwaharaGaussRadius;
+			Parameters->GaussSigma = Inputs.AnisoKuwaharaGaussSigma;
+			// UE_LOG(LogTemp, Log, TEXT("#### Inputs.AnisoKuwaharaGaussSigma=%f"), Inputs.AnisoKuwaharaGaussSigma);
+			// UE_LOG(LogTemp, Log, TEXT("#### Inputs.AnisoKuwaharaGaussSigma=%f"), Inputs.AnisoKuwaharaAlpha);
 		}
 	
 		TShaderMapRef<FAnisoKuwaharaBlurCS> cs(GetGlobalShaderMap(GMaxRHIFeatureLevel));
@@ -291,6 +300,10 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 			Parameters->finalpass_aniso_control = Inputs.aniso_kuwahara_aniso_control;
 			Parameters->finalpass_hardness = Inputs.aniso_kuwahara_hardness;
 			Parameters->finalpass_sharpness = Inputs.aniso_kuwahara_sharpness;
+
+			Parameters->KuwaharaRadius = Inputs.AnisoKuwaharaRadius;
+			Parameters->KuwaharaQ = Inputs.AnisoKuwaharaQ;
+			Parameters->KuwaharaAlpha = Inputs.AnisoKuwaharaAlpha;
 		}
 	
 		TShaderMapRef<FAnisoKuwaharaFinalCS> cs(GetGlobalShaderMap(GMaxRHIFeatureLevel));

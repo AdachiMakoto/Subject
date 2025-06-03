@@ -13,29 +13,29 @@ void AnisoKuwaharaEigenvectorCS(uint2 DTid : SV_DispatchThreadID)
 {
 	const float2 pixel_pos = DTid.xy + float2(0.5, 0.5);
 
-	float3 f00 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(-1, -1), 0)).xyz;
-	float3 f10 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(0, -1), 0)).xyz;
-	float3 f20 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(1, -1), 0)).xyz;
+	const float3 f00 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(-1, -1), 0)).xyz;
+	const float3 f10 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(0, -1), 0)).xyz;
+	const float3 f20 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(1, -1), 0)).xyz;
 
-	float3 f01 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(-1, 0), 0)).xyz;
-	float3 f21 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(1, 0), 0)).xyz;
+	const float3 f01 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(-1, 0), 0)).xyz;
+	const float3 f21 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(1, 0), 0)).xyz;
 		
-	float3 f02 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(-1, 1), 0)).xyz;
-	float3 f12 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(0, 1), 0)).xyz;
-	float3 f22 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(1, 1), 0)).xyz;
+	const float3 f02 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(-1, 1), 0)).xyz;
+	const float3 f12 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(0, 1), 0)).xyz;
+	const float3 f22 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(1, 1), 0)).xyz;
 
 	// sobel.
 	// TODO : 4は何の平均を出している？
-	float3 sx = ((1.0*f20 + 2.0*f21 + 1.0*f22) - (1.0*f00 + 2.0*f01 + 1.0*f02)) / 4.0;
-	float3 sy = ((1.0*f02 + 2.0*f12 + 1.0*f22) - (1.0*f00 + 2.0*f10 + 1.0*f20)) / 4.0;
+	const float3 sx = ((1.0*f20 + 2.0*f21 + 1.0*f22) - (1.0*f00 + 2.0*f01 + 1.0*f02)) / 4.0;
+	const float3 sy = ((1.0*f02 + 2.0*f12 + 1.0*f22) - (1.0*f00 + 2.0*f10 + 1.0*f20)) / 4.0;
 
 	//
 	// gijの計算
 	// 構造テンソル(局所的な勾配情報を統合する2×2の対称行列)
 	//
-	float exx = dot(sx, sx); // E
-	float exy = dot(sx, sy); // F
-	float eyy = dot(sy, sy); // G
+	const float exx = dot(sx, sx); // E
+	const float exy = dot(sx, sy); // F
+	const float eyy = dot(sy, sy); // G
 	
 	eigenvectorpass_OutputTexture[DTid.xy] = float4(exx, eyy, exy, 1);
 }
@@ -49,13 +49,20 @@ float GaussFunction(float sigma, float r)
 	//
 	// Gσの計算
 	// [P4]論文にあるガウスフィルタの計算( https://www.kyprianidis.com/p/pg2009/jkyprian-pg2009.pdf )
-	//
+	// ※微分
 	return (1.0f / sqrt(2.0f * PI * sigma * sigma)) * exp(-(r * r) / (2.0f * sigma * sigma));
+
+	// 実験中 : Unityの構文に合わせる
+	// float x = (float)(i - RADIUS);
+	// float g = exp(-x * x / (2.0 * sigma * sigma));
+	// return exp(-r * r / (2.0 * sigma * sigma));
 }
 
 Texture2D blurpass_SourceTexture;
 RWTexture2D<float4> blurpass_OutputTexture;
 uint2 blurpass_OutputDimensions;
+int GaussRadius;
+float GaussSigma;
 
 [numthreads(THREADGROUPSIZE_X,THREADGROUPSIZE_Y,THREADGROUPSIZE_Z)]
 void AnisoKuwaharaBlurCS(
@@ -66,7 +73,12 @@ void AnisoKuwaharaBlurCS(
 	)
 {
 	// TODO : カーネル固定値(上下、左右)
-	const int kernelRadius = 5;
+	// const int kernelRadius = 5;
+	// Add
+	const int kernelRadius = GaussRadius;
+	// const float gauss_sigma = GaussSigma;
+	// TODO : Test中。gauss_sigma=10の効果が無い。使い方が不明
+	const float gauss_sigma = 0.1f;
 
 	const int2 pixel_point = DTid.xy;
 
@@ -80,7 +92,12 @@ void AnisoKuwaharaBlurCS(
 			const int2 sample_offset = int2(i,j);
 			const float4 sampleL_data = blurpass_SourceTexture.Load(int3(pixel_point + sample_offset, 0));
 
-			const float g = GaussFunction(2.0, length(sample_offset));
+			// TODO : 元のコード
+			// const float g = GaussFunction(2.0, length(sample_offset));
+			const float g = GaussFunction(gauss_sigma, length(sample_offset));
+			// 実験中
+			// const int2 kernel = int2(kernelRadius, kernelRadius);
+			// const float g = GaussFunction(gauss_sigma, length(kernel) - length(sample_offset));
 
 			//
 			// fxの計算
@@ -126,8 +143,8 @@ void AnisoKuwaharaCalcAnisoCS(
 	// [4P]の右上の上側の式
 	const float term_sqrt = (1e-4 < sqrt_innner_term)? sqrt( sqrt_innner_term ) : 0.0;
 	// [4P]の右上の上側の式
-	float lambda1 = (E + G + term_sqrt) * 0.5;
-	float lambda2 = (E + G - term_sqrt) * 0.5;
+	const float lambda1 = (E + G + term_sqrt) * 0.5;
+	const float lambda2 = (E + G - term_sqrt) * 0.5;
 
 	//---------------------------------------------------------
 	// Aの計算
@@ -157,6 +174,10 @@ float finalpass_aniso_control; // 1
 float finalpass_hardness; // 8
 float finalpass_sharpness; // 8
 
+int KuwaharaRadius;
+int KuwaharaQ;
+float KuwaharaAlpha;
+
 #define k_aniso_kuwahara_section_count 8
 
 [numthreads(THREADGROUPSIZE_X,THREADGROUPSIZE_Y,THREADGROUPSIZE_Z)]
@@ -167,13 +188,17 @@ void AnisoKuwaharaFinalCS(
 	uint Gi		: SV_GroupIndex
 	)
 {
-	const int k_kernel_radius = 7;
-	const float k_aniso_param = finalpass_aniso_control;//1.0;
+	// TODO : 元コード
+	// const int k_kernel_radius = 7;
+	// const float k_aniso_param = finalpass_aniso_control;//1.0;
+	// Add
+	const int k_kernel_radius = KuwaharaRadius;
+	const float k_aniso_param = KuwaharaAlpha;
 	
 	const int2 pixel_point = DTid.xy;
 
-	float4 aniso_data = finalpass_SourceTexture.Load(int3(pixel_point, 0));
-	float4 cur_color = finalpass_SceneTexture.Load(int3(pixel_point, 0));
+	const float4 aniso_data = finalpass_SourceTexture.Load(int3(pixel_point, 0));
+	const float4 cur_color = finalpass_SceneTexture.Load(int3(pixel_point, 0));
 	
 	const float cos_phi = cos(aniso_data.z);
 	const float sin_phi = sin(aniso_data.z);
@@ -211,7 +236,7 @@ void AnisoKuwaharaFinalCS(
 			const int2 sample_offset = int2(i, j);
 			const float2 normalize_sample_offset = mul(SR, float2(sample_offset));
 			
-			float3 sample_color = finalpass_SceneTexture.Load(int3(pixel_point + sample_offset, 0)).xyz;
+			const float3 sample_color = finalpass_SceneTexture.Load(int3(pixel_point + sample_offset, 0)).xyz;
 
 			// https://github.com/GarrettGunnell/Post-Processing/blob/main/Assets/Kuwahara%20Filter/AnisotropicKuwahara.shader
 			float2 v = normalize_sample_offset;
@@ -219,8 +244,11 @@ void AnisoKuwaharaFinalCS(
 			float sum = 0;
             float w[k_aniso_kuwahara_section_count];
             float z, vxx, vyy;
-            
-            /* Calculate Polynomial Weights */
+
+			// フィルターカーネルの計算
+            /* Calculate Polynomial Weights */ // 多項式の重みを計算する
+			// Unity zeta = 0.33h
+			//       eta  = 3.77h
             vxx = zeta - eta * v.x * v.x;
             vyy = zeta - eta * v.y * v.y;
             z = max(0, v.y + vxx); 
@@ -235,6 +263,7 @@ void AnisoKuwaharaFinalCS(
             z = max(0, v.x + vyy); 
             w[6] = z * z;
             sum += w[6];
+			// Unityと違う
             v = sqrt(2.0f) / 2.0f * float2(v.x - v.y, v.x + v.y);
             vxx = zeta - eta * v.x * v.x;
             vyy = zeta - eta * v.y * v.y;
@@ -255,6 +284,7 @@ void AnisoKuwaharaFinalCS(
             for (int k = 0; k < k_aniso_kuwahara_section_count; ++k)
             {
                 float wk = w[k] * g;
+            	// Unityでも共通処理
                 m[k] += float4(sample_color * wk, wk);
                 s[k] += sample_color * sample_color * wk;
             }
@@ -262,20 +292,28 @@ void AnisoKuwaharaFinalCS(
 	}
 	
 	const float k_hardness = finalpass_hardness;//256;
-	const float k_sharpness = finalpass_sharpness;//8.0;
+	// TODO : 元コード
+	// const float k_sharpness = finalpass_sharpness;//8.0;
+	float k_sharpness = float(KuwaharaQ);
 	
 	float4 output = (float4)0;
 	for (int k = 0; k < k_aniso_kuwahara_section_count; ++k)
 	{
+		// Unityと共通処理
 		const float weight_div = (0.0 < m[k].w)? 1.0/m[k].w : 0.0;
 		m[k].rgb *= weight_div;
 		s[k] = abs(s[k] * weight_div - m[k].rgb * m[k].rgb);
 
-		float sigma2 = s[k].r + s[k].g + s[k].b;
-		float w = 1.0f / (1.0f + pow( k_hardness * 1000.0 * sigma2, k_sharpness));
+		const float sigma2 = s[k].r + s[k].g + s[k].b;
+		// Unityだと 『255.0h *』となっている
+		const float w = 1.0f / (1.0f + pow( k_hardness * 1000.0 * sigma2, k_sharpness));
 
+		// Unityでお計算方法は同じ
+		// Unity : o += w * half4(m[k].rgb, 1.0h);
 		output += float4(m[k].rgb * w, w);
 	}
+	// Unityでお計算方法は同じ
+	// Unity : half3(o.rgb / o.w); 
 	output.xyz = (0.0 < output.w)? output.xyz/output.w : cur_color.xyz;
 	
 	finalpass_OutputTexture[DTid.xy] = float4(output.xyz, 0);

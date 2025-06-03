@@ -207,6 +207,14 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		akInputCS.aniso_kuwahara_hardness = OutlineSubsystem->AnisoKuwahara_Hardness;
 		akInputCS.aniso_kuwahara_sharpness = OutlineSubsystem->AnisoKuwahara_Sharpness;
 		akInputCS.AKInputTexture = SetupTexture;
+
+		akInputCS.AnisoKuwaharaGaussRadius = OutlineSubsystem->UnityAnisoKuwaharaGaussRadius;
+		akInputCS.AnisoKuwaharaGaussSigma = OutlineSubsystem->UnityAnisoKuwaharaGaussSigma;
+		akInputCS.AnisoKuwaharaRadius = OutlineSubsystem->UnityAnisoKuwaharaRadius;
+		akInputCS.AnisoKuwaharaQ = OutlineSubsystem->UnityAnisoKuwaharaQ;
+		akInputCS.AnisoKuwaharaAlpha = OutlineSubsystem->UnityAnisoKuwaharaAlpha;
+		// UE_LOG(LogTemp, Log, TEXT("@@@@ OutlineSubsystem->UnityAnisoKuwaharaGaussSigma=%f"), OutlineSubsystem->UnityAnisoKuwaharaGaussSigma);
+		// UE_LOG(LogTemp, Log, TEXT("==== akInputCS.AnisoKuwaharaGaussSigma=%f"), akInputCS.AnisoKuwaharaGaussSigma);
 		AnisotropicKuwaharaPass(GraphBuilder, View, akInputCS);
 	}
 
