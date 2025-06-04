@@ -198,6 +198,7 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 	//
 	// 異方性桑原フィルタ
 	//
+	/*
 	if (OutlineSubsystem->EnableAnisoKuwahara)
 	{
 		FAnisotropicKuwaharaCSInput akInputCS;
@@ -213,9 +214,18 @@ void FOutlineViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBu
 		akInputCS.AnisoKuwaharaRadius = OutlineSubsystem->UnityAnisoKuwaharaRadius;
 		akInputCS.AnisoKuwaharaQ = OutlineSubsystem->UnityAnisoKuwaharaQ;
 		akInputCS.AnisoKuwaharaAlpha = OutlineSubsystem->UnityAnisoKuwaharaAlpha;
+		akInputCS.AnisoKuwaharaResolutionScale = OutlineSubsystem->UnityAnisoKuwaharaResolutionScale;
 		// UE_LOG(LogTemp, Log, TEXT("@@@@ OutlineSubsystem->UnityAnisoKuwaharaGaussSigma=%f"), OutlineSubsystem->UnityAnisoKuwaharaGaussSigma);
 		// UE_LOG(LogTemp, Log, TEXT("==== akInputCS.AnisoKuwaharaGaussSigma=%f"), akInputCS.AnisoKuwaharaGaussSigma);
 		AnisotropicKuwaharaPass(GraphBuilder, View, akInputCS);
+	}
+	*/
+	{
+		FAnisotropicKuwaharaCSInput akInputCS;
+		akInputCS.SceneTextures = Inputs.SceneTextures;
+		akInputCS.AnisoKuwaharaAlpha = OutlineSubsystem->UnityAnisoKuwaharaAlpha;
+		akInputCS.AnisoKuwaharaRadius = OutlineSubsystem->UnityAnisoKuwaharaRadius;
+		AIKuwaharaPass(GraphBuilder, View, akInputCS);
 	}
 
 	

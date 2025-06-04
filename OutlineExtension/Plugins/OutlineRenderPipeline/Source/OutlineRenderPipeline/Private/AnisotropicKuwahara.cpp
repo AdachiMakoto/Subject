@@ -170,6 +170,49 @@ public:
 };
 
 IMPLEMENT_GLOBAL_SHADER(FAnisoKuwaharaFinalCS, "/Plugin/OutlineRenderPipeline/Private/AnisotropicKuwahara.usf", "AnisoKuwaharaFinalCS", SF_Compute );
+
+
+// AIが作成したコード(動かない)
+class FAIKuwaharaCS : public FGlobalShader
+{public:
+	static constexpr uint32 THREADGROUPSIZE_X = 8;
+	static constexpr uint32 THREADGROUPSIZE_Y = 8;
+	static constexpr uint32 THREADGROUPSIZE_Z = 1;
+
+public:
+	DECLARE_GLOBAL_SHADER(FAIKuwaharaCS);
+	SHADER_USE_PARAMETER_STRUCT(FAIKuwaharaCS, FGlobalShader);
+
+	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
+		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, InputTex)
+		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, OutputTex)
+		SHADER_PARAMETER_SAMPLER(SamplerState, samplerLinearClamp)
+
+		SHADER_PARAMETER(FVector2f, ImageSize)
+		SHADER_PARAMETER(FVector2f, EllipseA)
+		SHADER_PARAMETER(float, Angle)
+		SHADER_PARAMETER(int32, NumSectors)
+		SHADER_PARAMETER(float, Radius)
+		SHADER_PARAMETER(float, Q)
+	END_SHADER_PARAMETER_STRUCT()
+
+	//Called by the engine to determine which permutations to compile for this shader
+	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
+	{
+		//return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
+		return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5) || IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM6);
+	}
+	//Modifies the compilations environment of the shader
+	static inline void ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
+	{
+		FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
+		OutEnvironment.SetDefine(TEXT("THREADGROUPSIZE_X"), THREADGROUPSIZE_X);
+		OutEnvironment.SetDefine(TEXT("THREADGROUPSIZE_Y"), THREADGROUPSIZE_Y);
+		OutEnvironment.SetDefine(TEXT("THREADGROUPSIZE_Z"), THREADGROUPSIZE_Z);
+	}
+};
+
+IMPLEMENT_GLOBAL_SHADER(FAIKuwaharaCS, "/Plugin/OutlineRenderPipeline/Private/AnisotropicKuwahara.usf", "AIKuwaharaCS", SF_Compute );
 	
 }
 
@@ -181,15 +224,20 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 {
 	const FIntRect PrimaryViewRect = UE::FXRenderingUtils::GetRawViewRectUnsafe(View);
 	FUintVector2 WorkRect(PrimaryViewRect.Width(), PrimaryViewRect.Height());
+	int width = PrimaryViewRect.Width();
+	int height = PrimaryViewRect.Height();
+	// TODO : 解像度を変更したい？ ⇒ 失敗。ビューポートがおかしくなるだけ
+	// int width = FMath::CeilToInt(Inputs.AnisoKuwaharaResolutionScale * WorkRect.X);
+	// int height = FMath::CeilToInt(Inputs.AnisoKuwaharaResolutionScale * WorkRect.Y);
 
 	FRHISamplerState* PointClampSampler = TStaticSamplerState<SF_Point, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
 
 
-	RDG_EVENT_SCOPE(GraphBuilder, "Naga_AnisoKuwaharaPass %dx%d", PrimaryViewRect.Width(), PrimaryViewRect.Height());
+	RDG_EVENT_SCOPE(GraphBuilder, "Naga_AnisoKuwaharaPass %dx%d", width, height);
 
 	
 	FRDGTextureRef tex_eigenvector = GraphBuilder.CreateTexture(
-		FRDGTextureDesc::Create2D(FIntPoint(PrimaryViewRect.Width(), PrimaryViewRect.Height()),
+		FRDGTextureDesc::Create2D(FIntPoint(width, height),
 			EPixelFormat::PF_FloatRGBA,
 			{},
 			ETextureCreateFlags::ShaderResource | ETextureCreateFlags::RenderTargetable | ETextureCreateFlags::UAV
@@ -221,10 +269,17 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		}
 	
 		TShaderMapRef<FAnisotropicKuwaharaEigenvectorCS> cs(GetGlobalShaderMap(GMaxRHIFeatureLevel));
+		FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(WorkRect.X, cs->THREADGROUPSIZE_X), FMath::DivideAndRoundUp(WorkRect.Y, cs->THREADGROUPSIZE_Y), 1);
 
-		FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(WorkRect.X, cs->THREADGROUPSIZE_X),
-				FMath::DivideAndRoundUp(WorkRect.Y, cs->THREADGROUPSIZE_Y), 1);
-	
+		// TODO : 解像度の変更に対応する ⇒ 失敗。ビューポートがおかしくなるだけ
+		// float fx = static_cast<float>(cs->THREADGROUPSIZE_X);
+		// float fy = static_cast<float>(cs->THREADGROUPSIZE_Y);
+		// int widthThread =  FMath::CeilToInt(width/fx);
+		// int heightThread =  FMath::CeilToInt(height/fy);
+		// int workx = WorkRect.X;
+		// int worky = WorkRect.Y;
+		// FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(workx, widthThread),FMath::DivideAndRoundUp(worky, heightThread), 1);
+
 		FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("AnisoKuwaharaEigenvector"), ERDGPassFlags::Compute, cs, Parameters, DispatchGroupSize);
 	}
 
@@ -244,9 +299,16 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		}
 	
 		TShaderMapRef<FAnisoKuwaharaBlurCS> cs(GetGlobalShaderMap(GMaxRHIFeatureLevel));
-		FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(WorkRect.X, cs->THREADGROUPSIZE_X),
-				FMath::DivideAndRoundUp(WorkRect.Y, cs->THREADGROUPSIZE_Y), 1);
-	
+		FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(WorkRect.X, cs->THREADGROUPSIZE_X), FMath::DivideAndRoundUp(WorkRect.Y, cs->THREADGROUPSIZE_Y), 1);
+
+		// TODO : 解像度の変更に対応する ⇒ 失敗。ビューポートがおかしくなるだけ
+		// float fx = static_cast<float>(cs->THREADGROUPSIZE_X);
+		// float fy = static_cast<float>(cs->THREADGROUPSIZE_Y);
+		// int widthThread =  FMath::CeilToInt(width/fx);
+		// int heightThread =  FMath::CeilToInt(height/fy);
+		// int workx = WorkRect.X;
+		// int worky = WorkRect.Y;
+		// FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(workx, widthThread),FMath::DivideAndRoundUp(worky, heightThread), 1);
 		FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("AnisoKuwaharaBlur"), ERDGPassFlags::Compute, cs, Parameters, DispatchGroupSize);
 	}
 
@@ -260,10 +322,16 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		}
 	
 		TShaderMapRef<FAnisoKuwaharaCalcAnisoCS> cs(GetGlobalShaderMap(GMaxRHIFeatureLevel));
+		FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(WorkRect.X, cs->THREADGROUPSIZE_X), FMath::DivideAndRoundUp(WorkRect.Y, cs->THREADGROUPSIZE_Y), 1);
 
-		FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(WorkRect.X, cs->THREADGROUPSIZE_X),
-				FMath::DivideAndRoundUp(WorkRect.Y, cs->THREADGROUPSIZE_Y), 1);
-	
+		// TODO : 解像度の変更に対応する ⇒ 失敗。ビューポートがおかしくなるだけ
+		// float fx = static_cast<float>(cs->THREADGROUPSIZE_X);
+		// float fy = static_cast<float>(cs->THREADGROUPSIZE_Y);
+		// int widthThread =  FMath::CeilToInt(width/fx);
+		// int heightThread =  FMath::CeilToInt(height/fy);
+		// int workx = WorkRect.X;
+		// int worky = WorkRect.Y;
+		// FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(workx, widthThread),FMath::DivideAndRoundUp(worky, heightThread), 1);
 		FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("AnisoKuwaharaBlur"), ERDGPassFlags::Compute, cs, Parameters, DispatchGroupSize);
 	}
 
@@ -307,10 +375,60 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		}
 	
 		TShaderMapRef<FAnisoKuwaharaFinalCS> cs(GetGlobalShaderMap(GMaxRHIFeatureLevel));
+		// FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(WorkRect.X, cs->THREADGROUPSIZE_X), FMath::DivideAndRoundUp(WorkRect.Y, cs->THREADGROUPSIZE_Y), 1);
 
-		FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(WorkRect.X, cs->THREADGROUPSIZE_X),
-				FMath::DivideAndRoundUp(WorkRect.Y, cs->THREADGROUPSIZE_Y), 1);
-	
+		// TODO : 解像度の変更に対応する
+		float fx = static_cast<float>(cs->THREADGROUPSIZE_X);
+		float fy = static_cast<float>(cs->THREADGROUPSIZE_Y);
+		int widthThread =  FMath::CeilToInt(width/fx);
+		int heightThread =  FMath::CeilToInt(height/fy);
+		int workx = WorkRect.X;
+		int worky = WorkRect.Y;
+		FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(workx, widthThread),FMath::DivideAndRoundUp(worky, heightThread), 1);		
 		FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("AnisoKuwaharaEigen"), ERDGPassFlags::Compute, cs, Parameters, DispatchGroupSize);
 	}
+}
+
+void AIKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, const FAnisotropicKuwaharaCSInput& Inputs)
+{
+	const FIntRect PrimaryViewRect = UE::FXRenderingUtils::GetRawViewRectUnsafe(View);
+	FUintVector2 WorkRect(PrimaryViewRect.Width(), PrimaryViewRect.Height());
+	int width = PrimaryViewRect.Width();
+	int height = PrimaryViewRect.Height();
+
+	FRHISamplerState* PointClampSampler = TStaticSamplerState<SF_Point, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
+
+
+	RDG_EVENT_SCOPE(GraphBuilder, "Naga_AnisoKuwaharaPass %dx%d", width, height);
+
+	
+	FRDGTextureRef tex_eigenvector = GraphBuilder.CreateTexture(
+		FRDGTextureDesc::Create2D(FIntPoint(width, height),
+			EPixelFormat::PF_FloatRGBA,
+			{},
+			ETextureCreateFlags::ShaderResource | ETextureCreateFlags::RenderTargetable | ETextureCreateFlags::UAV
+		), TEXT("AIKuwahara"));
+	
+	// Eigenvector.
+	{
+		FRHISamplerState* samplerLinearClamp = TStaticSamplerState<SF_Point, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
+		FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(tex_eigenvector);
+		FAIKuwaharaCS::FParameters* Parameters = GraphBuilder.AllocParameters<FAIKuwaharaCS::FParameters>();
+		{
+			Parameters->InputTex = Inputs.SceneTextures->GetParameters()->SceneColorTexture;
+			Parameters->samplerLinearClamp = samplerLinearClamp;
+			Parameters->OutputTex = WorkUav;
+			Parameters->ImageSize = FVector2f(width, height);
+			Parameters->EllipseA = FVector2f(1.0f, 1.0f);
+			Parameters->Angle = Inputs.AnisoKuwaharaAlpha;;
+			Parameters->NumSectors = 8;
+			Parameters->Radius = Inputs.AnisoKuwaharaRadius;
+			Parameters->Q = 8.0f;
+		}
+	
+		TShaderMapRef<FAIKuwaharaCS> cs(GetGlobalShaderMap(GMaxRHIFeatureLevel));
+		FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(WorkRect.X, cs->THREADGROUPSIZE_X), FMath::DivideAndRoundUp(WorkRect.Y, cs->THREADGROUPSIZE_Y), 1);
+		
+		FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("AIKuwahara"), ERDGPassFlags::Compute, cs, Parameters, DispatchGroupSize);
+	}	
 }
