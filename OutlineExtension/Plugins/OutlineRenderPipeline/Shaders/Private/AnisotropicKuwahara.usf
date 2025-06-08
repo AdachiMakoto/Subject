@@ -181,12 +181,15 @@ void AnisoKuwaharaCalcAnisoCS(
 	//---------------------------------------------------------
 	// tの計算
 	//---------------------------------------------------------
-	const float2 v = float2(lambda1 - E, -F);
-	const float2 t = (any(0 < abs(v)))? normalize(v) : float2(0.0f, 1.0f);
-	// TODO : atanするのはどこに書いてある？
-	const float phi = -atan2(t.y, t.x);
-		
-	calcanisopass_OutputTexture[DTid.xy] = float4(t.x, t.y, phi, anisotropy);
+	// TODO : 元コード
+	// const float2 v = float2(lambda1 - E, -F);
+	// const float2 t = (any(0 < abs(v)))? normalize(v) : float2(0.0f, 1.0f);
+	// const float phi = -atan2(t.y, t.x);
+	// calcanisopass_OutputTexture[DTid.xy] = float4(t.x, t.y, phi, anisotropy);
+
+	// NOTE : Unityの計算方法に合わせた
+	float phi = length(float2(-F, lambda1 - E)) > 0.0f ? atan2(-F, lambda1 - E) : atan2(0.0f, 1.0f);
+	calcanisopass_OutputTexture[DTid.xy] = float4(cos(phi), sin(phi), phi, anisotropy);
 }
 
 
@@ -232,7 +235,7 @@ half4 Integrate(float2 position, float2 direction, float2 invDimension) {
 }
 
 [numthreads(THREADGROUPSIZE_X,THREADGROUPSIZE_Y,THREADGROUPSIZE_Z)]
-void LineIntegralConvolutionCS(uint3 id : SV_DispatchThreadID) {
+void LineIntegralConvolutionCS(uint3 DTid : SV_DispatchThreadID) {
 	// StructuredBuffer<float> BufferGaussKernel;  // カーネルを作成する必要がありそう
 	float BufferGaussKernel[22] = {0.06634167f, 0.07942539f, 0.09136096f, 0.1009695f, 0.1072131f, 0.1093789f, 0.1072131f, 0.1009695f, 0.09136096f, 0.07942539f, 0.06634167f,
 								   0.08066656f, 0.08654258f, 0.09140719f, 0.09504844f, 0.09730244f, 0.0980656f, 0.09730244f, 0.09504844f, 0.09140719f, 0.08654258f, 0.08066656};
@@ -243,7 +246,7 @@ void LineIntegralConvolutionCS(uint3 id : SV_DispatchThreadID) {
     
 	float4 sumWeight = 0.0;
 	// 割合を求める p / width
-	float2 P = id.xy * invDimension;
+	float2 P = DTid.xy * invDimension;
 	// float2 G = lineintegranpass_ColorTexture.SampleLevel(point_clamp_sampler, P, 0).xy;
 	float2 G = lineintegranpass_ColorTexture.Load(int3(P, 0)).xy;
    
@@ -252,7 +255,7 @@ void LineIntegralConvolutionCS(uint3 id : SV_DispatchThreadID) {
 	sumWeight += Integrate(P + G * invDimension, +G, invDimension);
 	sumWeight += Integrate(P - G * invDimension, -G, invDimension);
 	const float3 color = float3(sumWeight.xyz / sumWeight.w);
-	lineintegranpass_OutputTexture[id.xy] = float4(color, 1.0f);
+	lineintegranpass_OutputTexture[DTid.xy] = float4(color, 1.0f);
 }
 
 
@@ -311,12 +314,12 @@ void AnisoKuwaharaFinalCS(
 	// NOTE : aniso_data(テンソル構造)を使用
 
 	// TODO : 元のコード
-	// const float scale_a = k_kernel_radius * clamp((k_aniso_param + aniso_data.w) / k_aniso_param, 0.1, 2.0);
-	// const float scale_b = k_kernel_radius * clamp(k_aniso_param / (k_aniso_param + aniso_data.w), 0.1, 2.0);
-	// const float2x2 S = float2x2(1.0/scale_a, 0.0, 0.0, 1.0/scale_b);
+	const float scale_a = k_kernel_radius * clamp((k_aniso_param + aniso_data.w) / k_aniso_param, 0.1, 2.0);
+	const float scale_b = k_kernel_radius * clamp(k_aniso_param / (k_aniso_param + aniso_data.w), 0.1, 2.0);
+	const float2x2 S = float2x2(1.0/scale_a, 0.0, 0.0, 1.0/scale_b);
 	//
 	// 異方性方向キャンセルと異方性スケールキャンセルの行列.
-	// float2x2 SR = mul(S, R);
+	float2x2 SR = mul(S, R);
 	//
 	const int sample_radius_x = k_kernel_radius;
 	const int sample_radius_y = k_kernel_radius;
@@ -335,10 +338,11 @@ void AnisoKuwaharaFinalCS(
 	float4 m[k_aniso_kuwahara_section_count];
 	float3 s[k_aniso_kuwahara_section_count];
 	// TODO : 元のコード
-	// for (int k = 0; k < k_aniso_kuwahara_section_count; ++k) {
-	// 	m[k] = 0.0;
-	// 	s[k] = 0.0;
-	// }
+	for (int k = 0; k < k_aniso_kuwahara_section_count; ++k) {
+		m[k] = 0.0;
+		s[k] = 0.0;
+	}
+	/*
 	{
 		float4 c = finalpass_SceneTexture[DTid.xy];
 		float w = rcp(float(k_aniso_kuwahara_section_count));
@@ -355,6 +359,7 @@ void AnisoKuwaharaFinalCS(
 
 	float3 total_color = float3(0.0f, 0.0f, 0.0f);
 	int total_count = 0;
+	*/
 	
 	// 7回ループ
 	for(int j = -sample_radius_y; j <= sample_radius_y; ++j)
@@ -365,8 +370,8 @@ void AnisoKuwaharaFinalCS(
 			const float2 normalize_sample_offset = mul(SR, float2(sample_offset));
 			
 			const float3 sample_color = finalpass_SceneTexture.Load(int3(pixel_point + sample_offset, 0)).xyz;
-			total_color += sample_color;
-			total_count++;
+			// total_color += sample_color;
+			// total_count++;
 			
 			// https://github.com/GarrettGunnell/Post-Processing/blob/main/Assets/Kuwahara%20Filter/AnisotropicKuwahara.shader
 			float2 v = normalize_sample_offset;
@@ -420,7 +425,7 @@ void AnisoKuwaharaFinalCS(
             }
 		}
 	}
-
+/*
 	float4 output = (float4)0;
 	for (int k = 0; k < k_aniso_kuwahara_section_count; ++k)
 	{
@@ -428,7 +433,8 @@ void AnisoKuwaharaFinalCS(
 	}
 	output.xyz = (0.0 < output.w)? output.xyz/output.w : cur_color.xyz;
 	finalpass_OutputTexture[DTid.xy] = float4(output.xyz, 0);
-/*	
+*/
+		
 	const float k_hardness = finalpass_hardness;//256;
 	// TODO : 元コード
 	// const float k_sharpness = finalpass_sharpness;//8.0;
@@ -455,5 +461,5 @@ void AnisoKuwaharaFinalCS(
 	output.xyz = (0.0 < output.w)? output.xyz/output.w : cur_color.xyz;
 	
 	finalpass_OutputTexture[DTid.xy] = float4(output.xyz, 0);
-*/
+
 }
