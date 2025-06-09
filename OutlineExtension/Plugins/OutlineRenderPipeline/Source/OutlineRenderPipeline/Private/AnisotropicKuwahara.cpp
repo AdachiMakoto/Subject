@@ -317,9 +317,7 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 
 	// CalcAniso.
 	{
-		FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(Inputs.SceneTextures->GetParameters()->SceneColorTexture);
-		// TODO : 元コード
-		// FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(tex_aniso);
+		FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(tex_aniso);
 		FAnisoKuwaharaCalcAnisoCS::FParameters* Parameters = GraphBuilder.AllocParameters<FAnisoKuwaharaCalcAnisoCS::FParameters>();
 		{
 			Parameters->calcanisopass_SourceTexture = tex_eigenvector_blurwork;
@@ -339,7 +337,7 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		// FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(workx, widthThread),FMath::DivideAndRoundUp(worky, heightThread), 1);
 		FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("AnisoKuwaharaCalcAniso"), ERDGPassFlags::Compute, cs, Parameters, DispatchGroupSize);
 	}
-	/*
+	
 	FRDGTextureDesc TexSceneColorCopyDesc = {};
 	{
 		const auto scene_color_desc = Inputs.SceneTextures->GetParameters()->SceneColorTexture->Desc;
@@ -361,8 +359,8 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 
 	// LineIntegralConvolution
 	{
-		FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(Inputs.SceneTextures->GetParameters()->SceneColorTexture);
-		// FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(tex_lineintegralconvolution_blurwork);
+		// FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(Inputs.SceneTextures->GetParameters()->SceneColorTexture);
+		FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(tex_lineintegralconvolution_blurwork);
 		FLineIntegralConvolutionCS::FParameters* Parameters = GraphBuilder.AllocParameters<FLineIntegralConvolutionCS::FParameters>();
 		{
 			Parameters->lineintegranpass_TSRVTexture = tex_eigenvector_blurwork;
@@ -385,8 +383,8 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		// FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(workx, widthThread),FMath::DivideAndRoundUp(worky, heightThread), 1);
 		FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("LineIntegralConvolution"), ERDGPassFlags::Compute, cs, Parameters, DispatchGroupSize);		
 	}
-*/
-	/*
+
+	
 	// Final.
 	{
 		FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(Inputs.SceneTextures->GetParameters()->SceneColorTexture);
@@ -394,9 +392,9 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		{
 			Parameters->finalpass_SourceTexture = tex_aniso;          // テンソル構造ベクトル
 			Parameters->finalpass_SourceSampler = PointClampSampler;  // 元のコピー画像そのまま
-			// Parameters->finalpass_SceneTexture = tex_lineintegralconvolution_blurwork;
+			Parameters->finalpass_SceneTexture = tex_lineintegralconvolution_blurwork;
 			// 元コード
-			Parameters->finalpass_SceneTexture = tex_scene_color_copy;
+			// Parameters->finalpass_SceneTexture = tex_scene_color_copy;
 			Parameters->finalpass_OutputTexture = WorkUav;
 
 			Parameters->finalpass_aniso_control = Inputs.aniso_kuwahara_aniso_control;
@@ -421,6 +419,6 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		// FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(workx, widthThread),FMath::DivideAndRoundUp(worky, heightThread), 1);		
 		FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("AnisoKuwaharaEigen"), ERDGPassFlags::Compute, cs, Parameters, DispatchGroupSize);
 	}
-	*/
+	
 
 }

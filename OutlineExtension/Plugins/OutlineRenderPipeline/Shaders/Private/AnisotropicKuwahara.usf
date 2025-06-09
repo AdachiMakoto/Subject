@@ -241,19 +241,30 @@ void LineIntegralConvolutionCS(uint3 DTid : SV_DispatchThreadID) {
 								   0.08066656f, 0.08654258f, 0.09140719f, 0.09504844f, 0.09730244f, 0.0980656f, 0.09730244f, 0.09504844f, 0.09140719f, 0.08654258f, 0.08066656};
 
 	float2 invDimension;
+	// テクスチャのサイズを取得
 	lineintegranpass_TSRVTexture.GetDimensions(invDimension.x, invDimension.y);
+	// 逆数
+	// ロードを使うなら、UV座標だとおかしいはず
 	invDimension = rcp(invDimension);
     
 	float4 sumWeight = 0.0;
-	// 割合を求める p / width
-	float2 P = DTid.xy * invDimension;
+	// 割合を求める p / width = 0.0～1.0の範囲に直す
+	// 元コード
+	// float2 P = DTid.xy * invDimension;
+	float2 P = DTid.xy;
 	// float2 G = lineintegranpass_ColorTexture.SampleLevel(point_clamp_sampler, P, 0).xy;
-	float2 G = lineintegranpass_ColorTexture.Load(int3(P, 0)).xy;
+	float2 G = lineintegranpass_TSRVTexture.Load(int3(DTid.xy, 0)).xy;
    
+	// TODO : 前のコード
 	// sumWeight += BufferGaussKernel[lineintegranpass_GaussRadius] * float4(lineintegranpass_ColorTexture.SampleLevel(linear_clamp_sampler, P, 0).xyz, 1.0);
-	sumWeight += BufferGaussKernel[lineintegranpass_GaussRadius] * float4(lineintegranpass_ColorTexture.Load(int3(P, 0)).xyz, 1.0);
-	sumWeight += Integrate(P + G * invDimension, +G, invDimension);
-	sumWeight += Integrate(P - G * invDimension, -G, invDimension);
+	// NOTE : テスト中
+	sumWeight += BufferGaussKernel[lineintegranpass_GaussRadius] * float4(lineintegranpass_ColorTexture.Load(int3(DTid.xy, 0)).xyz, 1.0);
+	// 元コード
+	// sumWeight += Integrate(P + G * invDimension, +G, invDimension);
+	// sumWeight += Integrate(P - G * invDimension, -G, invDimension);
+
+	sumWeight += Integrate(P + G, +G, float2(1.0f, 1.0f));
+	sumWeight += Integrate(P - G, -G, float2(1.0f, 1.0f));
 	const float3 color = float3(sumWeight.xyz / sumWeight.w);
 	lineintegranpass_OutputTexture[DTid.xy] = float4(color, 1.0f);
 }
