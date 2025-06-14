@@ -127,7 +127,7 @@ void AnisoKuwaharaBlurCS(
 
 	// 平坦化
 	// NOTE : ひょっとして二重にかけている？
-	// accum_data /= accum_weight;
+	accum_data /= accum_weight;
 		
 	blurpass_OutputTexture[DTid.xy] = accum_data;
 }
@@ -145,18 +145,27 @@ void GaussHSBlurCS(
 {
 	// カーネル範囲
 	const int kernelRadius = GaussRadius;
+	const float gauss_sigma = GaussSigma;
 	const int2 pixel_point = DTid.xy;
 
-	float BufferGaussKernel[22] = {0.06634167f, 0.07942539f, 0.09136096f, 0.1009695f, 0.1072131f, 0.1093789f, 0.1072131f, 0.1009695f, 0.09136096f, 0.07942539f, 0.06634167f,
-							   0.08066656f, 0.08654258f, 0.09140719f, 0.09504844f, 0.09730244f, 0.0980656f, 0.09730244f, 0.09504844f, 0.09140719f, 0.08654258f, 0.08066656};
+	// 方法①
+	// float BufferGaussKernel[22] = {0.06634167f, 0.07942539f, 0.09136096f, 0.1009695f, 0.1072131f, 0.1093789f, 0.1072131f, 0.1009695f, 0.09136096f, 0.07942539f, 0.06634167f,
+	//						   0.08066656f, 0.08654258f, 0.09140719f, 0.09504844f, 0.09730244f, 0.0980656f, 0.09730244f, 0.09504844f, 0.09140719f, 0.08654258f, 0.08066656};
 
-	float3 sum = half3(0.0f, 0.0f, 0.0f);  
+	float4 sum = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	float  accum_weight = 0;
 	for (int x = -kernelRadius; x <= kernelRadius; x++)
 	{
 		const float4 sampleL_data = blurpass_SourceTexture.Load(int3(pixel_point + int2(x, 0), 0));
-		sum += BufferGaussKernel[x + kernelRadius] * sampleL_data;
+		// 方法①
+		// sum += BufferGaussKernel[x + kernelRadius] * sampleL_data;
+		const float g = GaussFunction(gauss_sigma, length(int2(x, 0)));
+		sum += g * sampleL_data;
+		accum_weight += g;
 	}
-	TextureColorUAV[id.xy] = sum;
+	// 方法①
+	// blurpass_OutputTexture[DTid.xy] = sum;
+	blurpass_OutputTexture[DTid.xy] = sum / accum_weight;
 }
 
 [numthreads(THREADGROUPSIZE_X,THREADGROUPSIZE_Y,THREADGROUPSIZE_Z)]
@@ -169,18 +178,27 @@ void GaussVSBlurCS(
 {
 	// カーネル範囲
 	const int kernelRadius = GaussRadius;
+	const float gauss_sigma = GaussSigma;
 	const int2 pixel_point = DTid.xy;
 
-	float BufferGaussKernel[22] = {0.06634167f, 0.07942539f, 0.09136096f, 0.1009695f, 0.1072131f, 0.1093789f, 0.1072131f, 0.1009695f, 0.09136096f, 0.07942539f, 0.06634167f,
-							   0.08066656f, 0.08654258f, 0.09140719f, 0.09504844f, 0.09730244f, 0.0980656f, 0.09730244f, 0.09504844f, 0.09140719f, 0.08654258f, 0.08066656};
+	// 方法①
+	// float BufferGaussKernel[22] = {0.06634167f, 0.07942539f, 0.09136096f, 0.1009695f, 0.1072131f, 0.1093789f, 0.1072131f, 0.1009695f, 0.09136096f, 0.07942539f, 0.06634167f,
+	//						   0.08066656f, 0.08654258f, 0.09140719f, 0.09504844f, 0.09730244f, 0.0980656f, 0.09730244f, 0.09504844f, 0.09140719f, 0.08654258f, 0.08066656};
 
-	float3 sum = half3(0.0f, 0.0f, 0.0f);  
-	for (int y = -kernelRadius; y <= kernelRadius; x++)
+	float4 sum = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	float  accum_weight = 0;
+	for (int y = -kernelRadius; y <= kernelRadius; y++)
 	{
 		const float4 sampleL_data = blurpass_SourceTexture.Load(int3(pixel_point + int2(0, y), 0));
-		sum += BufferGaussKernel[y + kernelRadius] * sampleL_data;
+		// 方法①
+		// sum += BufferGaussKernel[y + kernelRadius] * sampleL_data;
+		const float g = GaussFunction(gauss_sigma, length(int2(0, y)));
+		sum += g * sampleL_data;
+		accum_weight += g;
 	}
-	TextureColorUAV[id.xy] = sum;
+	// 方法①
+	// blurpass_OutputTexture[DTid.xy] = sum;
+	blurpass_OutputTexture[DTid.xy] = sum / accum_weight;
 }
 
 
