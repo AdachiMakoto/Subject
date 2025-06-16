@@ -360,9 +360,9 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 	
 	// Eigenvector.
 	{
-		FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(Inputs.SceneTextures->GetParameters()->SceneColorTexture);
+		// FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(Inputs.SceneTextures->GetParameters()->SceneColorTexture);
 		// TODO : 元コード
-		//FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(tex_eigenvector);
+		FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(tex_eigenvector);
 		FAnisotropicKuwaharaEigenvectorCS::FParameters* Parameters = GraphBuilder.AllocParameters<FAnisotropicKuwaharaEigenvectorCS::FParameters>();
 		{
 			Parameters->eigenvectorpass_SourceTexture = Inputs.SceneTextures->GetParameters()->SceneColorTexture;
@@ -383,7 +383,7 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 
 		FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("AnisoKuwaharaEigenvector"), ERDGPassFlags::Compute, cs, Parameters, DispatchGroupSize);
 	}
-	/*
+	
 	// Blur.
 	{
 		
@@ -444,7 +444,7 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		TShaderMapRef<FGaussVSBlurCS> cs2(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 		FIntVector DispatchGroupSize2 = FIntVector(FMath::DivideAndRoundUp(WorkRect.X, cs2->THREADGROUPSIZE_X), FMath::DivideAndRoundUp(WorkRect.Y, cs2->THREADGROUPSIZE_Y), 1);
 		FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("GaussVSBlurCS"), ERDGPassFlags::Compute, cs2, Parameters2, DispatchGroupSize2);
-
+		
 	}
 	
 	// CalcAniso.
@@ -453,9 +453,9 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		FAnisoKuwaharaCalcAnisoCS::FParameters* Parameters = GraphBuilder.AllocParameters<FAnisoKuwaharaCalcAnisoCS::FParameters>();
 		{
 			// TODO : 元コード
-			Parameters->calcanisopass_SourceTexture = tex_eigenvector_blurwork;
+			// Parameters->calcanisopass_SourceTexture = tex_eigenvector_blurwork;
 			// NOTE : ガウシアンフィルタを分割
-			// Parameters->calcanisopass_SourceTexture = tex_gauss_vsblurwork;
+			Parameters->calcanisopass_SourceTexture = tex_gauss_vsblurwork;
 			// NOTE : ガウシアンフィルタで平均化しない
 			// Parameters->calcanisopass_SourceTexture = tex_eigenvector;
 			Parameters->calcanisopass_OutputTexture = WorkUav;
@@ -554,5 +554,5 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		// FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(workx, widthThread),FMath::DivideAndRoundUp(worky, heightThread), 1);		
 		FComputeShaderUtils::AddPass(GraphBuilder, RDG_EVENT_NAME("AnisoKuwaharaEigen"), ERDGPassFlags::Compute, cs, Parameters, DispatchGroupSize);
 	}
-	*/
+	
 }

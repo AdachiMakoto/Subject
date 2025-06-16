@@ -37,47 +37,23 @@ void AnisoKuwaharaEigenvectorCS(uint2 DTid : SV_DispatchThreadID)
 	const float sx = ((1.0*f20 + 2.0*f21 + 1.0*f22) - (1.0*f00 + 2.0*f01 + 1.0*f02));
 	const float sy = ((1.0*f02 + 2.0*f12 + 1.0*f22) - (1.0*f00 + 2.0*f10 + 1.0*f20));
 	// gijの計算
-	const float exx = clamp(sx * sx, 0.0f, 255.0f); // E
-	const float exy = clamp(sx * sy, 0.0f, 255.0f); // F
-	const float eyy = clamp(sy * sy, 0.0f, 255.0f); // G
+	// Sobelフィルタで求めた結果をベクトル化している
+	// TODO : 元コード
+	// const float exx = clamp(sx * sx, 0.0f, 255.0f); // E
+	// const float exy = clamp(sx * sy, 0.0f, 255.0f); // F
+	// const float eyy = clamp(sy * sy, 0.0f, 255.0f); // G
+	// NOTE : 実験
+	const float exx = sx * sx; // E
+	const float exy = sx * sy; // F
+	const float eyy = sy * sy; // G
+	// 各成分の大きさをベクトルとして使用する
 	eigenvectorpass_OutputTexture[DTid.xy] = float4(exx, eyy, exy, 1);
 
-	// NOTE : 平均化されるだけ
-	// SObelのエッジ抽出
-	// float edge = sqrt(sx * sx + sy * sy);
-	// eigenvectorpass_OutputTexture[DTid.xy] = float4(edge, edge, edge, 1);
-
-	
-	// const float2 pixel_pos = DTid.xy + float2(0.5, 0.5);
-/*
-	const float3 f00 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(-1, -1), 0)).xyz;
-	const float3 f10 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(0, -1), 0)).xyz;
-	const float3 f20 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(1, -1), 0)).xyz;
-
-	const float3 f01 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(-1, 0), 0)).xyz;
-	const float3 f21 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(1, 0), 0)).xyz;
-		
-	const float3 f02 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(-1, 1), 0)).xyz;
-	const float3 f12 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(0, 1), 0)).xyz;
-	const float3 f22 = eigenvectorpass_SourceTexture.Load(int3(DTid.xy + int2(1, 1), 0)).xyz;
-
-	// sobel.
-	// TODO : 4は何の平均を出している？
-	const float3 sx = ((1.0*f20 + 2.0*f21 + 1.0*f22) - (1.0*f00 + 2.0*f01 + 1.0*f02)) / 4.0;
-	const float3 sy = ((1.0*f02 + 2.0*f12 + 1.0*f22) - (1.0*f00 + 2.0*f10 + 1.0*f20)) / 4.0;
-
-	//
-	// gijの計算
-	// 構造テンソル(局所的な勾配情報を統合する2×2の対称行列)
-	//
-	const float exx = dot(sx, sx); // E
-	const float exy = dot(sx, sy); // F
-	const float eyy = dot(sy, sy); // G
-	
-	eigenvectorpass_OutputTexture[DTid.xy] = float4(exx, eyy, exy, 1);
-*/
-	// TODO : 反映されている事を確認した
-	// eigenvectorpass_OutputTexture[DTid.xy] = float4(1.0f, 0.0f, 0.0f, 1);
+	// NOTE : 実験
+	// Sobelフィルタでエッジを強調する(勾配強度)
+	// const float color = sqrt(sx * sx + sy * sy);
+	// const float intensity = saturate(color * 4.0f); 
+	// eigenvectorpass_OutputTexture[DTid.xy] = float4(intensity, intensity, intensity, intensity);
 }
 
 //
@@ -300,7 +276,6 @@ half4 Integrate(float2 position, float2 direction, float2 invDimension) {
 		//
 		// 案③ BufferGaussKernelを作る
 		// BufferGaussKernel は一次配列でアクセスする
-		// sumWeight += BufferGaussKernel[xi + lineintegranpass_GaussRadius] * float4(lineintegranpass_ColorTexture.SampleLevel(linear_clamp_sampler, position, 0).xyz, 1.0);
 		sumWeight += BufferGaussKernel[xi + lineintegranpass_GaussRadius] * float4(lineintegranpass_ColorTexture.Load(int3(position, 0)).xyz, 1.0);
 		position += direction * invDimension;
 	}  
@@ -328,8 +303,6 @@ void LineIntegralConvolutionCS(uint3 DTid : SV_DispatchThreadID) {
 	// float2 G = lineintegranpass_ColorTexture.SampleLevel(point_clamp_sampler, P, 0).xy;
 	float2 G = lineintegranpass_TFMTexture.Load(int3(DTid.xy, 0)).xy;
    
-	// TODO : 前のコード
-	// sumWeight += BufferGaussKernel[lineintegranpass_GaussRadius] * float4(lineintegranpass_ColorTexture.SampleLevel(linear_clamp_sampler, P, 0).xyz, 1.0);
 	// NOTE : テスト中
 	sumWeight += BufferGaussKernel[lineintegranpass_GaussRadius] * float4(lineintegranpass_ColorTexture.Load(int3(DTid.xy, 0)).xyz, 1.0);
 	// 元コード
@@ -610,15 +583,11 @@ void AnisoKuwaharaFinalCS(
 		// Unityだと 『255.0h *』となっている
 		// TODOV : 元コード
 		const float w = 1.0f / (1.0f + pow( k_hardness * 1000.0 * sigma2, k_sharpness));
-		// 実験中
-		// const float w = rcp(1.0h + pow(abs(255.0h * sigma2), 0.5h * k_sharpness));
 
 		// Unityでお計算方法は同じ
 		// Unity : o += w * half4(m[k].rgb, 1.0h);
 		// TODO : 元コード
 		output += float4(m[k].rgb * w, w);
-		// 実験中
-		// output += w * float4(m[k].rgb, 1.0f);
 	}
 	// Unityでお計算方法は同じ
 	// Unity : half3(o.rgb / o.w); 
