@@ -17,7 +17,8 @@ RWTexture2D<float4> eigenvectorpass_OutputTexture;
 [numthreads(THREADGROUPSIZE_X,THREADGROUPSIZE_Y,THREADGROUPSIZE_Z)]
 void AnisoKuwaharaEigenvectorCS(uint2 DTid : SV_DispatchThreadID)
 {
-	const float3 LuminanceConv = float3( 0.2125f, 0.7154f, 0.0721f );
+	// const float3 LuminanceConv = float3( 0.2125f, 0.7154f, 0.0721f );
+	const float3 LuminanceConv = float3( 0.299f, 0.587f, 0.114f );
 	// const float3 LuminanceConv = float3( 1.0f, 1.0f, 1.0f );
 
 	// ガンマ補正を考慮する
@@ -40,6 +41,11 @@ void AnisoKuwaharaEigenvectorCS(uint2 DTid : SV_DispatchThreadID)
 	const float exy = clamp(sx * sy, 0.0f, 255.0f); // F
 	const float eyy = clamp(sy * sy, 0.0f, 255.0f); // G
 	eigenvectorpass_OutputTexture[DTid.xy] = float4(exx, eyy, exy, 1);
+
+	// NOTE : 平均化されるだけ
+	// SObelのエッジ抽出
+	// float edge = sqrt(sx * sx + sy * sy);
+	// eigenvectorpass_OutputTexture[DTid.xy] = float4(edge, edge, edge, 1);
 
 	
 	// const float2 pixel_pos = DTid.xy + float2(0.5, 0.5);
