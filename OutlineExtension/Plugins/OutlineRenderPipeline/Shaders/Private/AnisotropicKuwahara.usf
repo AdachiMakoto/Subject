@@ -225,6 +225,7 @@ void AnisoKuwaharaCalcAnisoCS(
 	// tの計算
 	//---------------------------------------------------------
 	// TODO : 元コード
+	// エッジが経たない
 	// const float2 v = float2(lambda1 - E, -F);
 	// const float2 t = (any(0 < abs(v)))? normalize(v) : float2(0.0f, 1.0f);
 	// const float phi = -atan2(t.y, t.x);
@@ -233,10 +234,14 @@ void AnisoKuwaharaCalcAnisoCS(
 	// NOTE : Unityの計算方法に合わせた
 	// float phi = length(float2(-F, lambda1 - E)) > 0.0f ? atan2(-F, lambda1 - E) : atan2(0.0f, 1.0f);
 	// 発生するのはシアンのみ
-	const float phi = any(float2(-F, lambda1 - E) > 0.0f) ? -atan2(-F, lambda1 - E) : -atan2(0.0f, 1.0f);
+	// const float phi = any(float2(-F, lambda1 - E) > 0.0f) ? -atan2(-F, lambda1 - E) : -atan2(0.0f, 1.0f);
+	// XXX : 目的通りの動作をしてるけど、原理を理解できていない
+	const float phi = any(float2(-F, lambda1 - E) > 0.0f) ? atan2(-F, lambda1 - E) : atan2(0.0f, 1.0f);
 	// TODO : 青色(B成分)が出てくる
 	// const float phi = any(abs(float2(-F, lambda1 - E)) > 0.0f) ? -atan2(-F, lambda1 - E) : -atan2(0.0f, 1.0f);
 	// 色は、0.0f～1.0fの範囲
+	// float3(cos(phi), sin(phi), phi) でエッジの向きは出ているっぽい。縦ずらし
+	// float3(sin(phi), cos(phi), phi) でエッジの向きは出ているっぽい。横ずらし
 	calcanisopass_OutputTexture[DTid.xy] = float4(cos(phi), sin(phi), phi, anisotropy);
 
 	// NOTE : 分布図は違うがシアン成分が多く出てくる結果になった
