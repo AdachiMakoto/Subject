@@ -75,45 +75,6 @@ uint2 blurpass_OutputDimensions;
 int GaussRadius;
 float GaussSigma;
 
-[numthreads(THREADGROUPSIZE_X,THREADGROUPSIZE_Y,THREADGROUPSIZE_Z)]
-void AnisoKuwaharaBlurCS(
-	uint3 Gid	: SV_GroupID,
-	uint3 DTid	: SV_DispatchThreadID,
-	uint3 GTid	: SV_GroupThreadID,
-	uint Gi		: SV_GroupIndex
-	)
-{
-	// カーネル範囲
-	const int kernelRadius = GaussRadius;
-	const float gauss_sigma = GaussSigma;
-	const int2 pixel_point = DTid.xy;
-	
-	float4 accum_data = (float4)0;
-	float  accum_weight = 0;
-	for(int j = -kernelRadius; j <= kernelRadius; ++j)
-	{
-		for(int i = -kernelRadius; i <= kernelRadius; ++i)
-		{
-			const int2 sample_offset = int2(i,j);
-			const float4 sampleL_data = blurpass_SourceTexture.Load(int3(pixel_point + sample_offset, 0));
-
-			// ガウシアンフィルタ
-			const float g = GaussFunction(gauss_sigma, length(sample_offset));
-
-			// fxの計算
-			// 関数 f の偏導関数の近似
-			accum_data += g * sampleL_data;
-			accum_weight += g;
-		}
-	}
-
-	// 平坦化
-	// NOTE : ひょっとして二重にかけている？
-	accum_data /= accum_weight;
-		
-	blurpass_OutputTexture[DTid.xy] = accum_data;
-}
-
 //
 // TODO : GaussHSBlurCS / GaussVSBlurCS を動かしてみる
 // ガウスフィルタを横 ➡ 縦で計算し直す
@@ -130,23 +91,15 @@ void GaussHSBlurCS(
 	const float gauss_sigma = GaussSigma;
 	const int2 pixel_point = DTid.xy;
 
-	// 方法①
-	// float BufferGaussKernel[22] = {0.06634167f, 0.07942539f, 0.09136096f, 0.1009695f, 0.1072131f, 0.1093789f, 0.1072131f, 0.1009695f, 0.09136096f, 0.07942539f, 0.06634167f,
-	//						   0.08066656f, 0.08654258f, 0.09140719f, 0.09504844f, 0.09730244f, 0.0980656f, 0.09730244f, 0.09504844f, 0.09140719f, 0.08654258f, 0.08066656};
-
 	float4 sum = float4(0.0f, 0.0f, 0.0f, 0.0f);
 	float  accum_weight = 0;
 	for (int x = -kernelRadius; x <= kernelRadius; x++)
 	{
 		const float4 sampleL_data = blurpass_SourceTexture.Load(int3(pixel_point + int2(x, 0), 0));
-		// 方法①
-		// sum += BufferGaussKernel[x + kernelRadius] * sampleL_data;
 		const float g = GaussFunction(gauss_sigma, length(int2(x, 0)));
 		sum += g * sampleL_data;
 		accum_weight += g;
 	}
-	// 方法①
-	// blurpass_OutputTexture[DTid.xy] = sum;
 	blurpass_OutputTexture[DTid.xy] = sum / accum_weight;
 }
 
@@ -162,24 +115,16 @@ void GaussVSBlurCS(
 	const int kernelRadius = GaussRadius;
 	const float gauss_sigma = GaussSigma;
 	const int2 pixel_point = DTid.xy;
-
-	// 方法①
-	// float BufferGaussKernel[22] = {0.06634167f, 0.07942539f, 0.09136096f, 0.1009695f, 0.1072131f, 0.1093789f, 0.1072131f, 0.1009695f, 0.09136096f, 0.07942539f, 0.06634167f,
-	//						   0.08066656f, 0.08654258f, 0.09140719f, 0.09504844f, 0.09730244f, 0.0980656f, 0.09730244f, 0.09504844f, 0.09140719f, 0.08654258f, 0.08066656};
-
+	
 	float4 sum = float4(0.0f, 0.0f, 0.0f, 0.0f);
 	float  accum_weight = 0;
 	for (int y = -kernelRadius; y <= kernelRadius; y++)
 	{
 		const float4 sampleL_data = blurpass_SourceTexture.Load(int3(pixel_point + int2(0, y), 0));
-		// 方法①
-		// sum += BufferGaussKernel[y + kernelRadius] * sampleL_data;
 		const float g = GaussFunction(gauss_sigma, length(int2(0, y)));
 		sum += g * sampleL_data;
 		accum_weight += g;
 	}
-	// 方法①
-	// blurpass_OutputTexture[DTid.xy] = sum;
 	blurpass_OutputTexture[DTid.xy] = sum / accum_weight;
 }
 
@@ -224,30 +169,12 @@ void AnisoKuwaharaCalcAnisoCS(
 	//---------------------------------------------------------
 	// tの計算
 	//---------------------------------------------------------
-	// TODO : 元コード
-	// エッジが経たない
-	// const float2 v = float2(lambda1 - E, -F);
-	// const float2 t = (any(0 < abs(v)))? normalize(v) : float2(0.0f, 1.0f);
-	// const float phi = -atan2(t.y, t.x);
-	// calcanisopass_OutputTexture[DTid.xy] = float4(t.x, t.y, phi, anisotropy);
-
-	// NOTE : Unityの計算方法に合わせた
-	// float phi = length(float2(-F, lambda1 - E)) > 0.0f ? atan2(-F, lambda1 - E) : atan2(0.0f, 1.0f);
-	// 発生するのはシアンのみ
-	// const float phi = any(float2(-F, lambda1 - E) > 0.0f) ? -atan2(-F, lambda1 - E) : -atan2(0.0f, 1.0f);
 	// XXX : 目的通りの動作をしてるけど、原理を理解できていない
 	const float phi = any(float2(-F, lambda1 - E) > 0.0f) ? atan2(-F, lambda1 - E) : atan2(0.0f, 1.0f);
-	// TODO : 青色(B成分)が出てくる
-	// const float phi = any(abs(float2(-F, lambda1 - E)) > 0.0f) ? -atan2(-F, lambda1 - E) : -atan2(0.0f, 1.0f);
 	// 色は、0.0f～1.0fの範囲
 	// float3(cos(phi), sin(phi), phi) でエッジの向きは出ているっぽい。縦ずらし
 	// float3(sin(phi), cos(phi), phi) でエッジの向きは出ているっぽい。横ずらし
 	calcanisopass_OutputTexture[DTid.xy] = float4(cos(phi), sin(phi), phi, anisotropy);
-
-	// NOTE : 分布図は違うがシアン成分が多く出てくる結果になった
-	// Test①
-	// const float phi = length(float2(-F, lambda1 - E)) > 0.0f ? -atan2(-F, lambda1 - E) : -atan2(0.0f, 1.0f);
-	// calcanisopass_OutputTexture[DTid.xy] = float4(cos(phi), sin(phi), phi, anisotropy);
 }
 
 
@@ -292,28 +219,12 @@ void LineIntegralConvolutionCS(uint3 DTid : SV_DispatchThreadID) {
 	// StructuredBuffer<float> BufferGaussKernel;  // カーネルを作成する必要がありそう
 	float BufferGaussKernel[22] = {0.06634167f, 0.07942539f, 0.09136096f, 0.1009695f, 0.1072131f, 0.1093789f, 0.1072131f, 0.1009695f, 0.09136096f, 0.07942539f, 0.06634167f,
 								   0.08066656f, 0.08654258f, 0.09140719f, 0.09504844f, 0.09730244f, 0.0980656f, 0.09730244f, 0.09504844f, 0.09140719f, 0.08654258f, 0.08066656};
-
-	float2 invDimension;
-	// テクスチャのサイズを取得
-	lineintegranpass_TFMTexture.GetDimensions(invDimension.x, invDimension.y);
-	// 逆数
-	// ロードを使うなら、UV座標だとおかしいはず
-	invDimension = rcp(invDimension);
-    
 	float4 sumWeight = 0.0;
 	// 割合を求める p / width = 0.0～1.0の範囲に直す
-	// 元コード
-	// float2 P = DTid.xy * invDimension;
 	float2 P = DTid.xy;
-	// float2 G = lineintegranpass_ColorTexture.SampleLevel(point_clamp_sampler, P, 0).xy;
-	float2 G = lineintegranpass_TFMTexture.Load(int3(DTid.xy, 0)).xy;
-   
-	// NOTE : テスト中
-	sumWeight += BufferGaussKernel[lineintegranpass_GaussRadius] * float4(lineintegranpass_ColorTexture.Load(int3(DTid.xy, 0)).xyz, 1.0);
-	// 元コード
-	// sumWeight += Integrate(P + G * invDimension, +G, invDimension);
-	// sumWeight += Integrate(P - G * invDimension, -G, invDimension);
-
+	float2 G = lineintegranpass_TFMTexture.Load(int3(P, 0)).xy;
+	
+	sumWeight += BufferGaussKernel[lineintegranpass_GaussRadius] * float4(lineintegranpass_ColorTexture.Load(int3(P, 0)).xyz, 1.0);
 	sumWeight += Integrate(P + G, +G, float2(1.0f, 1.0f));
 	sumWeight += Integrate(P - G, -G, float2(1.0f, 1.0f));
 	const float3 color = float3(sumWeight.xyz / sumWeight.w);
@@ -369,135 +280,6 @@ void AnisoKuwaharaFinalCS(
 	const float zeta = 2.0 / k_kernel_radius;
 	const float gamma = 3.0 * PI / (2.0 * k_aniso_kuwahara_section_count);
 	const float eta = (zeta + cos(gamma)) / (sin(gamma)*sin(gamma));
-
-	// TODO : 元コード
-	/*
-	// NOTE : aniso_data(テンソル構造)を使用
-	const float cos_phi = cos(aniso_data.z);
-	const float sin_phi = sin(aniso_data.z);
-	const float2x2 R = float2x2(cos_phi, -sin_phi, sin_phi, cos_phi);
-
-	//---------------------------------------------------------
-	// Sの計算
-	// 異方性によるサンプル距離の最大・最小をクランプ.
-	//---------------------------------------------------------
-	// NOTE : 引数 KuwaharaRadius
-	// NOTE : 引数 KuwaharaAlpha
-	// NOTE : aniso_data(テンソル構造)を使用
-
-	// TODO : 元のコード
-	const float2x2 S = float2x2(1.0/scale_a, 0.0, 0.0, 1.0/scale_b);
-	//
-	// 異方性方向キャンセルと異方性スケールキャンセルの行列.
-	float2x2 SR = mul(S, R);
-	
-	// TODO : この変数は消せる。もしくは、縦横で別ける事で、調整パラメータ化可能？
-	const int sample_radius_x = k_kernel_radius;
-	const int sample_radius_y = k_kernel_radius;
-	
-	// NOTE:テスト中 
-	// Unity zeta = 0.33h
-	//       eta  = 3.77h
-	// const float zeta = 0.33f;
-	// const float eta = 3.77f;
-
-	 
-	float4 m[k_aniso_kuwahara_section_count];
-	float3 s[k_aniso_kuwahara_section_count];
-	// TODO : 元のコード
-	for (int k = 0; k < k_aniso_kuwahara_section_count; ++k) {
-		m[k] = 0.0;
-		s[k] = 0.0;
-	}
-
-	//
-	// TODO : Unityのコードに沿ったテスト中の仮データ
-	// 
-	// {
-	// 	float4 c = finalpass_SceneTexture[DTid.xy];
-	// 	float w = rcp(float(k_aniso_kuwahara_section_count));
-	// 	for (int k = 0; k < k_aniso_kuwahara_section_count; ++k) {
-	// 		m[k] = float4(c.xyz * w, w);
-	// 		float3 sc = c * c * w;
-	// 		s[k] = sc.xyz;
-	// 	}
-	// }
-	//  
-	// float2x2 SR = float2x2(aniso_data.x/scale_a, -aniso_data.y/scale_b, aniso_data.y/scale_a, aniso_data.x/scale_b);
-	//  
-	// float3 total_color = float3(0.0f, 0.0f, 0.0f);
-	// int total_count = 0;
-	
-	
-	// 7回ループ
-	for(int j = -sample_radius_y; j <= sample_radius_y; ++j)
-	{
-		for(int i = -sample_radius_x; i <= sample_radius_x; ++i)
-		{
-			const int2 sample_offset = int2(i, j);
-			const float2 normalize_sample_offset = mul(SR, float2(sample_offset));
-			
-			const float3 sample_color = finalpass_SceneTexture.Load(int3(pixel_point + sample_offset, 0)).xyz;
-			// total_color += sample_color;
-			// total_count++;
-			
-			// https://github.com/GarrettGunnell/Post-Processing/blob/main/Assets/Kuwahara%20Filter/AnisotropicKuwahara.shader
-			float2 v = normalize_sample_offset;
-		
-			float sum = 0;
-            float w[k_aniso_kuwahara_section_count];
-            float z, vxx, vyy;
-
-			// フィルターカーネルの計算
-            // * Calculate Polynomial Weights * / // 多項式の重みを計算する
-            vxx = zeta - eta * v.x * v.x;
-            vyy = zeta - eta * v.y * v.y;
-            z = max(0, v.y + vxx); 
-            w[0] = z * z;
-            sum += w[0];
-            z = max(0, -v.x + vyy); 
-            w[2] = z * z;
-            sum += w[2];
-            z = max(0, -v.y + vxx); 
-            w[4] = z * z;
-            sum += w[4];
-            z = max(0, v.x + vyy); 
-            w[6] = z * z;
-            sum += w[6];
-			// TODO : Unityと違う
-            v = sqrt(2.0f) / 2.0f * float2(v.x - v.y, v.x + v.y);
-			// Unity版
-			// v = 0.7071067811865475244f * float2(v.x - v.y, v.x + v.y);
-            vxx = zeta - eta * v.x * v.x;
-            vyy = zeta - eta * v.y * v.y;
-            z = max(0, v.y + vxx); 
-            w[1] = z * z;
-            sum += w[1];
-            z = max(0, -v.x + vyy); 
-            w[3] = z * z;
-            sum += w[3];
-            z = max(0, -v.y + vxx); 
-            w[5] = z * z;
-            sum += w[5];
-            z = max(0, v.x + vyy); 
-            w[7] = z * z;
-            sum += w[7];
-            
-            float g = (0.0 < sum)? exp(-3.125f * dot(v,v)) / sum : 0.0;
-            for (int k = 0; k < k_aniso_kuwahara_section_count; ++k)
-            {
-                float wk = w[k] * g;
-            	// Unityでも共通処理
-                m[k] += float4(sample_color * wk, wk);
-                s[k] += sample_color * sample_color * wk;
-
-            	m[(k + 4) & 7] += half4(c1 * wk, wk);
-            	s[(k + 4) & 7] += cc1 * wk;
-            }
-		}
-	}
-	*/
-
 
 	float2x2 SR = float2x2(aniso_data.x / scale_a, -aniso_data.y / scale_b, aniso_data.y / scale_a, aniso_data.x / scale_b);
     
@@ -586,12 +368,8 @@ void AnisoKuwaharaFinalCS(
 		const float sigma2 = s[k].r + s[k].g + s[k].b;
 		// TODO  : 要検討
 		// Unityだと 『255.0h *』となっている
-		// TODOV : 元コード
 		const float w = 1.0f / (1.0f + pow( k_hardness * 1000.0 * sigma2, k_sharpness));
-
-		// Unityでお計算方法は同じ
-		// Unity : o += w * half4(m[k].rgb, 1.0h);
-		// TODO : 元コード
+		
 		output += float4(m[k].rgb * w, w);
 	}
 	// Unityでお計算方法は同じ

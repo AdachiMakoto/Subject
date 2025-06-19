@@ -53,44 +53,7 @@ public:
 
 IMPLEMENT_GLOBAL_SHADER(FAnisotropicKuwaharaEigenvectorCS, "/Plugin/OutlineRenderPipeline/Private/AnisotropicKuwahara.usf", "AnisoKuwaharaEigenvectorCS", SF_Compute);
 
-
-class FAnisoKuwaharaBlurCS : public FGlobalShader
-{
-public:
-	static constexpr uint32 THREADGROUPSIZE_X = 16;
-	static constexpr uint32 THREADGROUPSIZE_Y = 16;
-	static constexpr uint32 THREADGROUPSIZE_Z = 1;
-
-public:
-	DECLARE_GLOBAL_SHADER(FAnisoKuwaharaBlurCS);
-	SHADER_USE_PARAMETER_STRUCT(FAnisoKuwaharaBlurCS, FGlobalShader);
-
-	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, blurpass_SourceTexture)
-		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, blurpass_OutputTexture)
-		SHADER_PARAMETER(FUintVector2, blurpass_OutputDimensions)
-		SHADER_PARAMETER(int32, GaussRadius)
-		SHADER_PARAMETER(float, GaussSigma)
-	END_SHADER_PARAMETER_STRUCT()
-
-	//Called by the engine to determine which permutations to compile for this shader
-	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
-	{
-		//return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
-		return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5) || IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM6);
-	}
-	//Modifies the compilations environment of the shader
-	static inline void ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
-	{
-		FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
-		OutEnvironment.SetDefine(TEXT("THREADGROUPSIZE_X"), THREADGROUPSIZE_X);
-		OutEnvironment.SetDefine(TEXT("THREADGROUPSIZE_Y"), THREADGROUPSIZE_Y);
-		OutEnvironment.SetDefine(TEXT("THREADGROUPSIZE_Z"), THREADGROUPSIZE_Z);
-	}
-};
 	
-IMPLEMENT_GLOBAL_SHADER(FAnisoKuwaharaBlurCS, "/Plugin/OutlineRenderPipeline/Private/AnisotropicKuwahara.usf", "AnisoKuwaharaBlurCS", SF_Compute );
-
 // ガウシアンフィルタ横
 class FGaussHSBlurCS : public FGlobalShader
 {
@@ -369,26 +332,6 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 	
 	// Blur.
 	{
-		
-		// FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(Inputs.SceneTextures->GetParameters()->SceneColorTexture);
-		// TODO : 元コード
-		// FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(tex_eigenvector_blurwork);
-		// FAnisoKuwaharaBlurCS::FParameters* Parameters = GraphBuilder.AllocParameters<FAnisoKuwaharaBlurCS::FParameters>();
-		// {
-			// tex_eigenvectorは、固有ベクトルの結果を持つ
-		// 	Parameters->blurpass_SourceTexture = tex_eigenvector;
-		// 	Parameters->blurpass_OutputTexture = WorkUav;
-		// 	Parameters->blurpass_OutputDimensions = WorkRect;
-		// 	Parameters->GaussRadius = Inputs.AnisoKuwaharaGaussRadius;
-		// 	Parameters->GaussSigma = Inputs.AnisoKuwaharaGaussSigma;
-			// UE_LOG(LogTemp, Log, TEXT("#### Inputs.AnisoKuwaharaGaussSigma=%f"), Inputs.AnisoKuwaharaGaussSigma);
-			// UE_LOG(LogTemp, Log, TEXT("#### Inputs.AnisoKuwaharaGaussSigma=%f"), Inputs.AnisoKuwaharaAlpha);
-		// }
-		//
-		// TShaderMapRef<FAnisoKuwaharaBlurCS> cs(GetGlobalShaderMap(GMaxRHIFeatureLevel));
-		// FIntVector DispatchGroupSize = FIntVector(FMath::DivideAndRoundUp(WorkRect.X, cs->THREADGROUPSIZE_X), FMath::DivideAndRoundUp(WorkRect.Y, cs->THREADGROUPSIZE_Y), 1);
-
-		
 		FRDGTextureUAVRef WorkUav = GraphBuilder.CreateUAV(tex_gauss_hsblurwork);
 		FGaussHSBlurCS::FParameters* Parameters = GraphBuilder.AllocParameters<FGaussHSBlurCS::FParameters>();
 		{
@@ -484,9 +427,6 @@ void AnisotropicKuwaharaPass(FRDGBuilder& GraphBuilder, const FSceneView& View, 
 		{
 			Parameters->finalpass_TFMTexture = tex_aniso;          // テンソル構造ベクトル
 			Parameters->finalpass_SceneTexture = tex_lineintegralconvolution_blurwork;
-			// TODO : 元コード
-			// そのままの画像を渡している
-			// Parameters->finalpass_SceneTexture = tex_scene_color_copy;
 			Parameters->finalpass_OutputTexture = WorkUav;
 
 			Parameters->finalpass_aniso_control = Inputs.aniso_kuwahara_aniso_control;
